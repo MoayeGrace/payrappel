@@ -1,0 +1,61 @@
+class ClientModel {
+  final String id;
+  final String userId;
+  final String name;
+  final String phone;
+  final String email;
+  final String note;
+  final DateTime createdAt;
+
+  const ClientModel({
+    required this.id,
+    required this.userId,
+    required this.name,
+    required this.phone,
+    this.email = '',
+    this.note = '',
+    required this.createdAt,
+  });
+
+  factory ClientModel.fromMap(Map<String, dynamic> map, String id) {
+    return ClientModel(
+      id: id,
+      userId: map['userId'] as String? ?? '',
+      name: map['name'] as String? ?? '',
+      phone: map['phone'] as String? ?? '',
+      email: map['email'] as String? ?? '',
+      note: map['note'] as String? ?? '',
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        map['createdAt'] as int? ?? 0,
+      ),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'userId': userId,
+      'name': name,
+      'phone': phone,
+      'email': email,
+      'note': note,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+    };
+  }
+
+  ClientModel copyWith({
+    String? name,
+    String? phone,
+    String? email,
+    String? note,
+  }) {
+    return ClientModel(
+      id: id,
+      userId: userId,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      note: note ?? this.note,
+      createdAt: createdAt,
+    );
+  }
+}
