@@ -78,12 +78,12 @@ class HomeScreen extends StatelessWidget {
             onTap: () => context.push('/payments'),
           ),
           const SizedBox(height: AppSizes.paddingMedium),
-          const _MenuCard(
-            icon: Icons.notifications,
+          _MenuCard(
+            icon: Icons.notifications_active_outlined,
             label: 'Rappels',
-            description: 'Disponible à la Phase 7',
-            color: Colors.grey,
-            onTap: null,
+            description: 'Programmer des rappels de paiement',
+            color: Colors.deepPurple,
+            onTap: () => context.push('/reminders'),
           ),
         ],
       ),

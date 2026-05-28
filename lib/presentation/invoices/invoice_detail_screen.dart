@@ -7,8 +7,10 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../data/models/invoice_model.dart';
 import '../../data/models/payment_model.dart';
+import '../../data/models/reminder_model.dart';
 import '../../providers/invoice_provider.dart';
 import '../../providers/payment_provider.dart';
+import '../../providers/reminder_provider.dart';
 import 'invoices_screen.dart' show statusColor, statusLabel;
 
 class InvoiceDetailScreen extends StatelessWidget {
@@ -146,6 +148,317 @@ Future<void> _showAddPaymentSheet(BuildContext context, InvoiceModel invoice) as
   );
 }
 
+DateTime _computeReminderDate(
+  DateTime dueDate,
+  ReminderType type,
+  int days,
+  int hour,
+  int minute,
+) {
+  final base = switch (type) {
+    ReminderType.beforeDue => dueDate.subtract(Duration(days: days)),
+    ReminderType.onDue => dueDate,
+    ReminderType.afterDue => dueDate.add(Duration(days: days)),
+    ReminderType.custom => dueDate,
+  };
+  return DateTime(base.year, base.month, base.day, hour, minute);
+}
+
+Future<void> _showAddReminderSheet(BuildContext context, InvoiceModel invoice) async {
+  var type = ReminderType.beforeDue;
+  var days = 3;
+  var hour = 9;
+  var minute = 0;
+  DateTime? customDate;
+  bool submitting = false;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (sheetCtx) => StatefulBuilder(
+      builder: (sheetCtx, setSheetState) {
+        DateTime? scheduledAt;
+        if (type == ReminderType.custom) {
+          if (customDate != null) {
+            scheduledAt = DateTime(
+                customDate!.year, customDate!.month, customDate!.day, hour, minute);
+          }
+        } else {
+          scheduledAt =
+              _computeReminderDate(invoice.dueDate, type, days, hour, minute);
+        }
+        final isPast =
+            scheduledAt != null && scheduledAt.isBefore(DateTime.now());
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24, 24, 24,
+            MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Créer un rappel',
+                style:
+                    TextStyle(fontSize: AppSizes.fontLarge, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${invoice.title} · ${CurrencyFormatter.format(invoice.remainingAmount)} restants',
+                style: const TextStyle(
+                    fontSize: AppSizes.fontSmall, color: AppColors.textSecondary),
+              ),
+              Text(
+                'Échéance : ${DateFormatter.format(invoice.dueDate)}',
+                style: const TextStyle(
+                    fontSize: AppSizes.fontSmall, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              const Text('Quand envoyer ce rappel ?',
+                  style: TextStyle(fontWeight: FontWeight.w500)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _TypeChip(
+                    label: 'Avant',
+                    selected: type == ReminderType.beforeDue,
+                    onTap: () => setSheetState(() => type = ReminderType.beforeDue),
+                  ),
+                  _TypeChip(
+                    label: 'Le jour J',
+                    selected: type == ReminderType.onDue,
+                    onTap: () => setSheetState(() => type = ReminderType.onDue),
+                  ),
+                  _TypeChip(
+                    label: 'Après',
+                    selected: type == ReminderType.afterDue,
+                    onTap: () => setSheetState(() => type = ReminderType.afterDue),
+                  ),
+                  _TypeChip(
+                    label: 'Date libre',
+                    selected: type == ReminderType.custom,
+                    onTap: () =>
+                        setSheetState(() => type = ReminderType.custom),
+                  ),
+                ],
+              ),
+              if (type == ReminderType.custom) ...[
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: sheetCtx,
+                      initialDate: customDate ??
+                          DateTime.now().add(const Duration(days: 1)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2035),
+                      locale: const Locale('fr', 'FR'),
+                    );
+                    if (picked != null) {
+                      setSheetState(() => customDate = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Choisir une date',
+                      suffixIcon:
+                          Icon(Icons.calendar_today_outlined, size: 18),
+                    ),
+                    child: Text(
+                      customDate != null
+                          ? DateFormatter.format(customDate!)
+                          : 'Appuyez pour choisir…',
+                      style: TextStyle(
+                        color: customDate == null ? Colors.grey : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ] else if (type != ReminderType.onDue) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text(
+                      type == ReminderType.beforeDue
+                          ? 'Jours avant : '
+                          : 'Jours après : ',
+                      style: const TextStyle(fontSize: AppSizes.fontSmall),
+                    ),
+                    SizedBox(
+                      width: 60,
+                      child: TextFormField(
+                        initialValue: days.toString(),
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(isDense: true),
+                        onChanged: (v) {
+                          final parsed = int.tryParse(v);
+                          if (parsed != null && parsed > 0) {
+                            setSheetState(() => days = parsed);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Le rappel sera envoyé le ${DateFormatter.format(invoice.dueDate)}',
+                  style: const TextStyle(
+                      fontSize: AppSizes.fontSmall,
+                      color: AppColors.textSecondary),
+                ),
+              ],
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: sheetCtx,
+                    initialTime: TimeOfDay(hour: hour, minute: minute),
+                  );
+                  if (picked != null) {
+                    setSheetState(() {
+                      hour = picked.hour;
+                      minute = picked.minute;
+                    });
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Heure de notification',
+                    suffixIcon: Icon(Icons.access_time, size: 18),
+                  ),
+                  child: Text(
+                    '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (type == ReminderType.custom && customDate == null)
+                      ? Colors.grey[100]
+                      : isPast
+                          ? Colors.red[50]
+                          : Colors.deepPurple.withOpacity(0.07),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      (type == ReminderType.custom && customDate == null)
+                          ? Icons.info_outline
+                          : isPast
+                              ? Icons.warning_amber_outlined
+                              : Icons.event_outlined,
+                      size: 16,
+                      color: (type == ReminderType.custom && customDate == null)
+                          ? Colors.grey
+                          : isPast
+                              ? Colors.red
+                              : Colors.deepPurple,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        (type == ReminderType.custom && customDate == null)
+                            ? 'Choisissez une date dans le calendrier'
+                            : isPast
+                                ? type == ReminderType.onDue
+                                    ? 'La date d\'échéance est déjà passée — utilisez "Date libre" pour choisir une autre date'
+                                    : 'Cette date est déjà passée'
+                                : 'Rappel prévu le ${DateFormatter.format(scheduledAt!)} à ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+                        style: TextStyle(
+                          fontSize: AppSizes.fontSmall,
+                          color: (type == ReminderType.custom && customDate == null)
+                              ? Colors.grey
+                              : isPast
+                                  ? Colors.red
+                                  : Colors.deepPurple,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: (submitting ||
+                          isPast ||
+                          scheduledAt == null)
+                      ? null
+                      : () async {
+                          setSheetState(() => submitting = true);
+                          await context.read<ReminderProvider>().addReminder(
+                                invoiceId: invoice.id,
+                                clientId: invoice.clientId,
+                                clientName: invoice.clientName,
+                                invoiceTitle: invoice.title,
+                                remainingAmount: invoice.remainingAmount,
+                                type: type,
+                                scheduledAt: scheduledAt!,
+                              );
+                          if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
+                        },
+                  child: submitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Créer le rappel'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+class _TypeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _TypeChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? Colors.deepPurple : Colors.deepPurple.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: AppSizes.fontSmall,
+            color: selected ? Colors.white : Colors.deepPurple,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _InvoiceDetailView extends StatelessWidget {
   final InvoiceModel invoice;
   const _InvoiceDetailView({required this.invoice});
@@ -188,6 +501,12 @@ class _InvoiceDetailView extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Facture'),
         actions: [
+          if (!invoice.isFullyPaid)
+            IconButton(
+              icon: const Icon(Icons.notification_add_outlined),
+              tooltip: 'Créer un rappel',
+              onPressed: () => _showAddReminderSheet(context, invoice),
+            ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Modifier',

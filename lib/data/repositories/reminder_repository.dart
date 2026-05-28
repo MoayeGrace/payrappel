@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../models/reminder_model.dart';
+
+const _kWriteTimeout = Duration(seconds: 5);
 
 class ReminderRepository {
   final _db = FirebaseFirestore.instance;
@@ -58,7 +61,7 @@ class ReminderRepository {
       channel: channel,
       scheduledAt: scheduledAt,
     );
-    await _collection.doc(id).set(reminder.toMap());
+    await _collection.doc(id).set(reminder.toMap()).timeout(_kWriteTimeout, onTimeout: () {});
     return reminder;
   }
 
@@ -67,11 +70,11 @@ class ReminderRepository {
     await _collection.doc(reminderId).update({
       'isSent': true,
       'sentAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    }).timeout(_kWriteTimeout, onTimeout: () {});
   }
 
   // Supprimer un rappel
   Future<void> deleteReminder(String reminderId) async {
-    await _collection.doc(reminderId).delete();
+    await _collection.doc(reminderId).delete().timeout(_kWriteTimeout, onTimeout: () {});
   }
 }

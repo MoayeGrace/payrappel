@@ -1,4 +1,4 @@
-enum ReminderType { beforeDue, onDue, afterDue }
+enum ReminderType { beforeDue, onDue, afterDue, custom }
 
 enum ReminderChannel { push, whatsapp, sms }
 

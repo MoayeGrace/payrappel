@@ -17,9 +17,11 @@ import 'presentation/invoices/invoices_screen.dart';
 import 'presentation/invoices/add_edit_invoice_screen.dart';
 import 'presentation/invoices/invoice_detail_screen.dart';
 import 'presentation/payments/payments_screen.dart';
+import 'presentation/reminders/reminders_screen.dart';
 import 'providers/client_provider.dart';
 import 'providers/invoice_provider.dart';
 import 'providers/payment_provider.dart';
+import 'providers/reminder_provider.dart';
 
 final _router = GoRouter(
   initialLocation: '/login',
@@ -52,6 +54,8 @@ final _router = GoRouter(
     ),
     // Paiements
     GoRoute(path: '/payments', builder: (_, __) => const PaymentsScreen()),
+    // Rappels
+    GoRoute(path: '/reminders', builder: (_, __) => const RemindersScreen()),
     // Factures
     GoRoute(path: '/invoices', builder: (_, __) => const InvoicesScreen()),
     GoRoute(
@@ -87,6 +91,7 @@ class PayRappelApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ClientProvider()),
         ChangeNotifierProvider(create: (_) => InvoiceProvider()),
         ChangeNotifierProvider(create: (_) => PaymentProvider()),
+        ChangeNotifierProvider(create: (_) => ReminderProvider()),
       ],
       child: MaterialApp.router(
         title: 'PayRappel',
