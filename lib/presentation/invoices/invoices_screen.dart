@@ -115,57 +115,106 @@ class _InvoiceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = statusColor(invoice.status);
+
     return Card(
       margin: const EdgeInsets.only(bottom: AppSizes.paddingSmall),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.12),
-          child: Icon(statusIcon(invoice.status), color: color, size: 20),
-        ),
-        title: Text(
-          invoice.title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Column(
+      clipBehavior: Clip.hardEdge,
+      child: InkWell(
+        onTap: () => context.push('/invoices/${invoice.id}'),
+        child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(invoice.clientName),
-            const SizedBox(height: 4),
-            Row(
+
+            // ICON
+            CircleAvatar(
+              backgroundColor: color.withOpacity(0.12),
+              child: Icon(
+                statusIcon(invoice.status),
+                color: color,
+                size: 20,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            // LEFT CONTENT
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+
+                  // TITLE
+                  Text(
+                    invoice.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: AppSizes.fontMedium,
+                    ),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  // CLIENT
+                  Text(
+                    invoice.clientName,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // STATUS
+                  StatusChip(status: invoice.status),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            // RIGHT CONTENT
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                StatusChip(status: invoice.status),
-                const Spacer(),
+
+                // PRICE
                 Text(
-                  DateFormatter.format(invoice.dueDate),
-                  style: const TextStyle(fontSize: AppSizes.fontSmall),
+                  CurrencyFormatter.format(invoice.totalAmount),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: AppSizes.fontMedium,
+                  ),
                 ),
+
+                const SizedBox(height: 4),
+
+                // DATE
+                Text(
+                  'Délais : ${DateFormatter.format(invoice.dueDate)}',
+                  style: const TextStyle(
+                    fontSize: AppSizes.fontSmall,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+
+                if (invoice.paidAmount > 0) ...[
+                  const SizedBox(height: 6),
+
+                  Text(
+                    'Reste : ${CurrencyFormatter.format(invoice.remainingAmount)}',
+                    style: const TextStyle(
+                      fontSize: AppSizes.fontSmall,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
         ),
-        isThreeLine: true,
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              CurrencyFormatter.format(invoice.totalAmount),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: AppSizes.fontMedium,
-              ),
-            ),
-            if (invoice.paidAmount > 0)
-              Text(
-                'Reste : ${CurrencyFormatter.format(invoice.remainingAmount)}',
-                style: const TextStyle(
-                  fontSize: AppSizes.fontSmall,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-          ],
         ),
-        onTap: () => context.push('/invoices/${invoice.id}'),
       ),
     );
   }

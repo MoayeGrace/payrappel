@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../models/payment_model.dart';
 import 'invoice_repository.dart';
+
+const _kWriteTimeout = Duration(seconds: 5);
 
 class PaymentRepository {
   final _db = FirebaseFirestore.instance;
@@ -57,10 +60,7 @@ class PaymentRepository {
       paidAt: paidAt ?? DateTime.now(),
     );
 
-    // Sauvegarde le paiement
-    await _collection.doc(id).set(payment.toMap());
-
-    // Recalcule le total payé sur la facture
+    await _collection.doc(id).set(payment.toMap()).timeout(_kWriteTimeout, onTimeout: () {});
     await _recalculateInvoicePaidAmount(invoiceId);
 
     return payment;
@@ -68,15 +68,14 @@ class PaymentRepository {
 
   // Supprimer un paiement et recalculer la facture
   Future<void> deletePayment(String paymentId, String invoiceId) async {
-    await _collection.doc(paymentId).delete();
+    await _collection.doc(paymentId).delete().timeout(_kWriteTimeout, onTimeout: () {});
     await _recalculateInvoicePaidAmount(invoiceId);
   }
 
-  // Recalcule la somme des paiements pour une facture et met à jour la facture
   Future<void> _recalculateInvoicePaidAmount(String invoiceId) async {
     final snap = await _collection
         .where('invoiceId', isEqualTo: invoiceId)
-        .get();
+        .get(const GetOptions(source: Source.cache));
 
     final total = snap.docs.fold<double>(
       0,

@@ -22,6 +22,7 @@ class ClientDetailScreen extends StatefulWidget {
 class _ClientDetailScreenState extends State<ClientDetailScreen> {
   ClientModel? _client;
   bool _loading = true;
+  int _refreshKey = 0;
 
   @override
   void initState() {
@@ -30,6 +31,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   }
 
   Future<void> _loadClient() async {
+    setState(() => _loading = true);
     final client =
         await context.read<ClientProvider>().getClient(widget.clientId);
     if (mounted) {
@@ -38,6 +40,11 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         _loading = false;
       });
     }
+  }
+
+  void _refresh() {
+    setState(() => _refreshKey++);
+    _loadClient();
   }
 
   Future<void> _confirmDelete() async {
@@ -84,6 +91,11 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         title: Text(client.name),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Actualiser',
+            onPressed: _refresh,
+          ),
+          IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Modifier',
             onPressed: () =>
@@ -122,7 +134,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             ],
           ),
           const SizedBox(height: AppSizes.paddingSmall),
-          _ClientInvoiceList(clientId: client.id),
+          _ClientInvoiceList(key: ValueKey(_refreshKey), clientId: client.id),
         ],
       ),
     );
@@ -131,7 +143,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
 
 class _ClientInvoiceList extends StatelessWidget {
   final String clientId;
-  const _ClientInvoiceList({required this.clientId});
+  const _ClientInvoiceList({super.key, required this.clientId});
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +153,27 @@ class _ClientInvoiceList extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Container(
+            padding: const EdgeInsets.all(AppSizes.paddingLarge),
+            decoration: BoxDecoration(
+              color: Colors.red[50],
+              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red),
+                SizedBox(width: AppSizes.paddingSmall),
+                Expanded(
+                  child: Text(
+                    'Erreur de chargement des factures.',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            ),
+          );
         }
         final invoices = snapshot.data ?? [];
         if (invoices.isEmpty) {

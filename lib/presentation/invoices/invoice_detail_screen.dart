@@ -167,8 +167,13 @@ class _InvoiceDetailView extends StatelessWidget {
       ),
     );
     if (confirmed == true && context.mounted) {
-      await context.read<InvoiceProvider>().deleteInvoice(invoice.id);
-      if (context.mounted) context.pop();
+      final invoiceProvider = context.read<InvoiceProvider>();
+      final messenger = ScaffoldMessenger.of(context);
+      context.pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Facture supprimée')),
+      );
+      await invoiceProvider.deleteInvoice(invoice.id);
     }
   }
 

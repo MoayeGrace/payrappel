@@ -1,7 +1,13 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../models/client_model.dart';
+
+// Écritures Firestore : en mode hors connexion le cache local est mis à jour
+// immédiatement, mais le Future n'est résolu que quand le serveur confirme.
+// Ce timeout permet de ne pas bloquer l'UI indéfiniment.
+const _kWriteTimeout = Duration(seconds: 5);
 
 class ClientRepository {
   final _db = FirebaseFirestore.instance;
@@ -47,18 +53,18 @@ class ClientRepository {
       note: note,
       createdAt: DateTime.now(),
     );
-    await _collection.doc(id).set(client.toMap());
+    await _collection.doc(id).set(client.toMap()).timeout(_kWriteTimeout, onTimeout: () {});
     return client;
   }
 
   // Modifier un client
   Future<void> updateClient(ClientModel client) async {
-    await _collection.doc(client.id).update(client.toMap());
+    await _collection.doc(client.id).update(client.toMap()).timeout(_kWriteTimeout, onTimeout: () {});
   }
 
   // Supprimer un client
   Future<void> deleteClient(String clientId) async {
-    await _collection.doc(clientId).delete();
+    await _collection.doc(clientId).delete().timeout(_kWriteTimeout, onTimeout: () {});
   }
 
   // Rechercher des clients par nom

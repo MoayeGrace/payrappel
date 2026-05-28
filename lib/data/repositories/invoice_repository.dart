@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../models/invoice_model.dart';
 import '../../domain/invoice_calculator.dart';
+
+const _kWriteTimeout = Duration(seconds: 5);
 
 class InvoiceRepository {
   final _db = FirebaseFirestore.instance;
@@ -28,11 +31,14 @@ class InvoiceRepository {
   Stream<List<InvoiceModel>> watchInvoicesByClient(String clientId) {
     return _collection
         .where('clientId', isEqualTo: clientId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => InvoiceModel.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snap) {
+      final list = snap.docs
+          .map((doc) => InvoiceModel.fromMap(doc.data(), doc.id))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
   }
 
   // Écouter une facture spécifique en temps réel
@@ -72,11 +78,15 @@ class InvoiceRepository {
       totalAmount: totalAmount,
       paidAmount: 0,
       dueDate: dueDate,
-      status: InvoiceStatus.draft,
+      status: InvoiceCalculator.computeStatus(
+        totalAmount: totalAmount,
+        paidAmount: 0,
+        dueDate: dueDate,
+      ),
       createdAt: now,
       updatedAt: now,
     );
-    await _collection.doc(id).set(invoice.toMap());
+    await _collection.doc(id).set(invoice.toMap()).timeout(_kWriteTimeout, onTimeout: () {});
     return invoice;
   }
 
@@ -96,17 +106,17 @@ class InvoiceRepository {
       'paidAmount': newPaidAmount,
       'status': newStatus.name,
       'updatedAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    }).timeout(_kWriteTimeout, onTimeout: () {});
   }
 
   // Modifier une facture
   Future<void> updateInvoice(InvoiceModel invoice) async {
-    await _collection.doc(invoice.id).update(invoice.toMap());
+    await _collection.doc(invoice.id).update(invoice.toMap()).timeout(_kWriteTimeout, onTimeout: () {});
   }
 
   // Supprimer une facture
   Future<void> deleteInvoice(String invoiceId) async {
-    await _collection.doc(invoiceId).delete();
+    await _collection.doc(invoiceId).delete().timeout(_kWriteTimeout, onTimeout: () {});
   }
 
   // Recalcule et met à jour les statuts des factures en retard
@@ -129,6 +139,6 @@ class InvoiceRepository {
         });
       }
     }
-    await batch.commit();
+    await batch.commit().timeout(_kWriteTimeout, onTimeout: () {});
   }
 }
