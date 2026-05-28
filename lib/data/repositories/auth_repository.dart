@@ -57,4 +57,16 @@ class AuthRepository {
   Future<void> resetPassword(String email) async {
     await _auth.sendPasswordResetEmail(email: email.trim());
   }
+
+  // Supprimer le compte (avec ré-authentification pour les comptes email)
+  Future<void> deleteAccount({String? email, String? password}) async {
+    if (email != null && password != null) {
+      final credential = EmailAuthProvider.credential(
+        email: email.trim(),
+        password: password,
+      );
+      await _auth.currentUser!.reauthenticateWithCredential(credential);
+    }
+    await _auth.currentUser!.delete();
+  }
 }

@@ -18,10 +18,12 @@ import 'presentation/invoices/add_edit_invoice_screen.dart';
 import 'presentation/invoices/invoice_detail_screen.dart';
 import 'presentation/payments/payments_screen.dart';
 import 'presentation/reminders/reminders_screen.dart';
+import 'presentation/settings/settings_screen.dart';
 import 'providers/client_provider.dart';
 import 'providers/invoice_provider.dart';
 import 'providers/payment_provider.dart';
 import 'providers/reminder_provider.dart';
+import 'providers/theme_provider.dart';
 
 final _router = GoRouter(
   initialLocation: '/login',
@@ -56,6 +58,8 @@ final _router = GoRouter(
     GoRoute(path: '/payments', builder: (_, __) => const PaymentsScreen()),
     // Rappels
     GoRoute(path: '/reminders', builder: (_, __) => const RemindersScreen()),
+    // Paramètres
+    GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
     // Factures
     GoRoute(path: '/invoices', builder: (_, __) => const InvoicesScreen()),
     GoRoute(
@@ -88,40 +92,61 @@ class PayRappelApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => ClientProvider()),
         ChangeNotifierProvider(create: (_) => InvoiceProvider()),
         ChangeNotifierProvider(create: (_) => PaymentProvider()),
         ChangeNotifierProvider(create: (_) => ReminderProvider()),
       ],
-      child: MaterialApp.router(
-        title: 'PayRappel',
-        debugShowCheckedModeBanner: false,
-        routerConfig: _router,
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [
-          Locale('fr', 'FR'),
-          Locale('en', 'US'),
-        ],
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
-          useMaterial3: true,
-          scaffoldBackgroundColor: AppColors.backgroundLight,
-          appBarTheme: const AppBarTheme(
-            backgroundColor: AppColors.surface,
-            foregroundColor: AppColors.textPrimary,
-            elevation: 0,
-          ),
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) => MaterialApp.router(
+          title: 'PayRappel',
+          debugShowCheckedModeBanner: false,
+          routerConfig: _router,
+          themeMode: themeProvider.mode,
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('fr', 'FR'),
+            Locale('en', 'US'),
+          ],
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
+            useMaterial3: true,
+            scaffoldBackgroundColor: AppColors.backgroundLight,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: AppColors.surface,
+              foregroundColor: AppColors.textPrimary,
+              elevation: 0,
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSizes.paddingMedium,
-              vertical: AppSizes.paddingSmall + 6,
+            inputDecorationTheme: InputDecorationTheme(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSizes.paddingMedium,
+                vertical: AppSizes.paddingSmall + 6,
+              ),
+            ),
+          ),
+          darkTheme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppColors.primary,
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+            appBarTheme: const AppBarTheme(elevation: 0),
+            inputDecorationTheme: InputDecorationTheme(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSizes.paddingMedium,
+                vertical: AppSizes.paddingSmall + 6,
+              ),
             ),
           ),
         ),
