@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/utils/currency_formatter.dart';
@@ -8,9 +9,12 @@ import '../../core/utils/date_formatter.dart';
 import '../../data/models/invoice_model.dart';
 import '../../data/models/payment_model.dart';
 import '../../data/models/reminder_model.dart';
+import '../../providers/client_provider.dart';
 import '../../providers/invoice_provider.dart';
 import '../../providers/payment_provider.dart';
 import '../../providers/reminder_provider.dart';
+import '../../providers/subscription_provider.dart';
+import '../../services/pdf_service.dart';
 import 'invoices_screen.dart' show statusColor, statusLabel;
 
 class InvoiceDetailScreen extends StatelessWidget {
@@ -164,7 +168,7 @@ DateTime _computeReminderDate(
   return DateTime(base.year, base.month, base.day, hour, minute);
 }
 
-Future<void> _showAddReminderSheet(BuildContext context, InvoiceModel invoice) async {
+Future<void> showAddReminderSheet(BuildContext context, InvoiceModel invoice) async {
   var type = ReminderType.beforeDue;
   var days = 3;
   var hour = 9;
@@ -490,6 +494,56 @@ class _InvoiceDetailView extends StatelessWidget {
     }
   }
 
+  Future<void> _openWhatsApp(BuildContext context) async {
+    final clientProvider = context.read<ClientProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final client = await clientProvider.getClient(invoice.clientId);
+    final phone = client?.phone ?? '';
+    if (phone.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Numéro de téléphone manquant pour ce client')),
+      );
+      return;
+    }
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final message =
+        'Bonjour ${invoice.clientName}, nous vous rappelons qu\'il vous reste '
+        '${CurrencyFormatter.format(invoice.remainingAmount)} FCFA à régler pour '
+        '"${invoice.title}". Merci.';
+    final uri = Uri.parse('https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Impossible d\'ouvrir WhatsApp')),
+      );
+    }
+  }
+
+  Future<void> _exportPdf(BuildContext context) async {
+    final isPro = context.read<SubscriptionProvider>().isPro;
+    if (!isPro) {
+      context.push('/upgrade', extra: 'pdf');
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    final clientProvider = context.read<ClientProvider>();
+    final paymentProvider = context.read<PaymentProvider>();
+    messenger.showSnackBar(const SnackBar(content: Text('Génération du PDF…')));
+    try {
+      final client = await clientProvider.getClient(invoice.clientId);
+      final payments = await paymentProvider.watchPaymentsByInvoice(invoice.id).first;
+      final bytes = await PdfService.generateInvoicePdf(
+        invoice: invoice,
+        payments: payments,
+        clientPhone: client?.phone,
+        clientEmail: client?.email,
+      );
+      await PdfService.sharePdf(
+          bytes, filename: 'facture_${invoice.title.replaceAll(' ', '_')}.pdf');
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Erreur PDF : $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = statusColor(invoice.status);
@@ -505,17 +559,44 @@ class _InvoiceDetailView extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.notification_add_outlined),
               tooltip: 'Créer un rappel',
-              onPressed: () => _showAddReminderSheet(context, invoice),
+              onPressed: () => showAddReminderSheet(context, invoice),
             ),
           IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Modifier',
-            onPressed: () => context.push('/invoices/${invoice.id}/edit', extra: invoice),
+            icon: const Icon(Icons.send_outlined, color: Color(0xFF25D366)),
+            tooltip: 'Envoyer via WhatsApp',
+            onPressed: () => _openWhatsApp(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
-            tooltip: 'Supprimer',
-            onPressed: () => _confirmDelete(context),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (v) {
+              if (v == 'edit') {
+                context.push('/invoices/${invoice.id}/edit', extra: invoice);
+              } else if (v == 'pdf') {
+                _exportPdf(context);
+              } else if (v == 'delete') {
+                _confirmDelete(context);
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'edit', child: ListTile(
+                leading: Icon(Icons.edit_outlined),
+                title: Text('Modifier'),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              )),
+              const PopupMenuItem(value: 'pdf', child: ListTile(
+                leading: Icon(Icons.picture_as_pdf_outlined),
+                title: Text('Exporter en PDF'),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              )),
+              const PopupMenuItem(value: 'delete', child: ListTile(
+                leading: Icon(Icons.delete_outline, color: Colors.red),
+                title: Text('Supprimer', style: TextStyle(color: Colors.red)),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              )),
+            ],
           ),
         ],
       ),

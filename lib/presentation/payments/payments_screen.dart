@@ -7,12 +7,16 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../data/models/payment_model.dart';
 import '../../providers/payment_provider.dart';
+import '../../providers/subscription_provider.dart';
 
 class PaymentsScreen extends StatelessWidget {
   const PaymentsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final sub = context.watch<SubscriptionProvider>();
+    final cutoff = sub.freeHistoryCutoff;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Paiements')),
       body: StreamBuilder<List<PaymentModel>>(
@@ -21,7 +25,13 @@ class PaymentsScreen extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final payments = snapshot.data ?? [];
+          var payments = snapshot.data ?? [];
+
+          // Limite gratuite : historique 3 mois
+          if (cutoff != null) {
+            payments = payments.where((p) => p.paidAt.isAfter(cutoff)).toList();
+          }
+
           if (payments.isEmpty) {
             return Center(
               child: Column(
@@ -43,10 +53,47 @@ class PaymentsScreen extends StatelessWidget {
               ),
             );
           }
-          return ListView.builder(
-            padding: const EdgeInsets.all(AppSizes.paddingLarge),
-            itemCount: payments.length,
-            itemBuilder: (context, i) => _PaymentTile(payment: payments[i]),
+          return Column(
+            children: [
+              if (cutoff != null)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.lock_clock_outlined, color: AppColors.primary, size: 16),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Historique limité à 3 mois (offre gratuite)',
+                          style: TextStyle(fontSize: 12, color: AppColors.primary),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => context.push('/upgrade', extra: 'history'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Pro', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(AppSizes.paddingLarge),
+                  itemCount: payments.length,
+                  itemBuilder: (context, i) => _PaymentTile(payment: payments[i]),
+                ),
+              ),
+            ],
           );
         },
       ),

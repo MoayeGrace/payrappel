@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -14,11 +15,55 @@ class SettingsScreen extends StatelessWidget {
     final isGuest = authRepo.isAnonymous;
     final email = authRepo.currentUser?.email ?? '';
     final themeProvider = context.watch<ThemeProvider>();
+    final sub = context.watch<SubscriptionProvider>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Paramètres')),
       body: ListView(
         children: [
+          // ── Abonnement ──────────────────────────────────────────────────────
+          const _SectionHeader('Abonnement'),
+          sub.isPro
+              ? ListTile(
+                  leading: const Icon(Icons.workspace_premium, color: Color(0xFF34A853)),
+                  title: const Text(
+                    'PayRappel Pro',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF34A853),
+                    ),
+                  ),
+                  subtitle: sub.user?.proExpiry != null
+                      ? Text(
+                          'Valide jusqu\'au ${_formatDate(sub.user!.proExpiry!)}',
+                          style: const TextStyle(fontSize: 12),
+                        )
+                      : const Text('Abonnement actif'),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF34A853).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Pro',
+                      style: TextStyle(
+                        color: Color(0xFF34A853),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                )
+              : ListTile(
+                  leading: const Icon(Icons.workspace_premium_outlined, color: Color(0xFF1A73E8)),
+                  title: const Text('Passer au Pro'),
+                  subtitle: const Text('Débloquez PDF, Excel, clients illimités'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/upgrade'),
+                ),
+
+          // ── Apparence ───────────────────────────────────────────────────────
           const _SectionHeader('Apparence'),
           SwitchListTile(
             secondary: Icon(
@@ -29,6 +74,8 @@ class SettingsScreen extends StatelessWidget {
             onChanged: (v) =>
                 themeProvider.setMode(v ? ThemeMode.dark : ThemeMode.light),
           ),
+
+          // ── Compte ──────────────────────────────────────────────────────────
           if (!isGuest) ...[
             const _SectionHeader('Compte'),
             ListTile(
@@ -44,6 +91,8 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => _resetPassword(context, email, authRepo),
             ),
           ],
+
+          // ── Mode invité ─────────────────────────────────────────────────────
           if (isGuest) ...[
             const _SectionHeader('Mode invité'),
             ListTile(
@@ -54,6 +103,8 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => context.push('/register'),
             ),
           ],
+
+          // ── Session ─────────────────────────────────────────────────────────
           const _SectionHeader('Session'),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.orange),
@@ -61,6 +112,8 @@ class SettingsScreen extends StatelessWidget {
                 style: TextStyle(color: Colors.orange)),
             onTap: () => _confirmLogout(context, authRepo),
           ),
+
+          // ── Zone de danger ──────────────────────────────────────────────────
           const _SectionHeader('Zone de danger'),
           ListTile(
             leading:
@@ -68,7 +121,7 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Supprimer le compte',
                 style: TextStyle(color: Colors.red)),
             subtitle: const Text(
-                'Action irréversible , toutes vos données seront perdues'),
+                'Action irréversible, toutes vos données seront perdues'),
             onTap: () =>
                 _confirmDeleteAccount(context, isGuest, email, authRepo),
           ),
@@ -76,6 +129,9 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
+
+  String _formatDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   Future<void> _confirmLogout(
       BuildContext context, AuthRepository authRepo) async {

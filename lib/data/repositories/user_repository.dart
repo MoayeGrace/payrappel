@@ -8,46 +8,30 @@ class UserRepository {
 
   String get _uid => _auth.currentUser!.uid;
 
-  DocumentReference<Map<String, dynamic>> get _userDoc =>
+  DocumentReference<Map<String, dynamic>> get _doc =>
       _db.collection('users').doc(_uid);
 
-  Future<UserModel?> getUser() async {
-    final doc = await _userDoc.get();
-    if (!doc.exists) return null;
-    return UserModel.fromMap(doc.data()!, doc.id);
+  Stream<UserModel?> watchUser() => _doc.snapshots().map(
+        (snap) => snap.exists ? UserModel.fromMap(snap.data()!, snap.id) : null,
+      );
+
+  Future<UserModel> getOrCreateUser() async {
+    final snap = await _doc.get();
+    if (snap.exists) return UserModel.fromMap(snap.data()!, snap.id);
+    final user = UserModel(id: _uid);
+    await _doc.set(user.toMap());
+    return user;
   }
 
-  Future<void> saveUser(UserModel user) async {
-    await _userDoc.set(user.toMap(), SetOptions(merge: true));
-  }
-
-  Future<void> updateActivity({
-    required String activityName,
-    required String activityType,
-    required String displayName,
+  Future<void> updateProStatus({
+    required bool isPro,
+    DateTime? proExpiry,
+    String? planType,
   }) async {
-    await _userDoc.update({
-      'activityName': activityName,
-      'activityType': activityType,
-      'displayName': displayName,
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-    });
-  }
-
-  // Crée le profil lors de la première connexion
-  Future<void> createIfNotExists() async {
-    final doc = await _userDoc.get();
-    if (doc.exists) return;
-
-    final user = _auth.currentUser!;
-    final newUser = UserModel(
-      id: _uid,
-      email: user.email ?? '',
-      displayName: user.displayName ?? '',
-      activityName: '',
-      activityType: '',
-      createdAt: DateTime.now(),
-    );
-    await _userDoc.set(newUser.toMap());
+    await _doc.set({
+      'isPro': isPro,
+      if (proExpiry != null) 'proExpiry': proExpiry.millisecondsSinceEpoch,
+      if (planType != null) 'planType': planType,
+    }, SetOptions(merge: true));
   }
 }

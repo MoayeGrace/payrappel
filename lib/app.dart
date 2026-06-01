@@ -18,11 +18,14 @@ import 'presentation/invoices/add_edit_invoice_screen.dart';
 import 'presentation/invoices/invoice_detail_screen.dart';
 import 'presentation/payments/payments_screen.dart';
 import 'presentation/reminders/reminders_screen.dart';
+import 'presentation/export/export_screen.dart';
 import 'presentation/settings/settings_screen.dart';
+import 'presentation/subscription/upgrade_screen.dart';
 import 'providers/client_provider.dart';
 import 'providers/invoice_provider.dart';
 import 'providers/payment_provider.dart';
 import 'providers/reminder_provider.dart';
+import 'providers/subscription_provider.dart';
 import 'providers/theme_provider.dart';
 
 final _router = GoRouter(
@@ -60,6 +63,14 @@ final _router = GoRouter(
     GoRoute(path: '/reminders', builder: (_, __) => const RemindersScreen()),
     // Paramètres
     GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+    // Abonnement
+    GoRoute(
+      path: '/upgrade',
+      builder: (_, state) =>
+          UpgradeScreen(featureHint: state.extra as String?),
+    ),
+    // Export
+    GoRoute(path: '/export', builder: (_, __) => const ExportScreen()),
     // Factures
     GoRoute(path: '/invoices', builder: (_, __) => const InvoicesScreen()),
     GoRoute(
@@ -93,6 +104,7 @@ class PayRappelApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => SubscriptionProvider()),
         ChangeNotifierProvider(create: (_) => ClientProvider()),
         ChangeNotifierProvider(create: (_) => InvoiceProvider()),
         ChangeNotifierProvider(create: (_) => PaymentProvider()),

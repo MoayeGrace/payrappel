@@ -93,6 +93,14 @@ class HomeScreen extends StatelessWidget {
             color: Colors.deepPurple,
             onTap: () => context.push('/reminders'),
           ),
+          const SizedBox(height: AppSizes.paddingMedium),
+          _MenuCard(
+            icon: Icons.download_outlined,
+            label: 'Export',
+            description: 'Exporter en Excel ou PDF',
+            color: Colors.teal,
+            onTap: () => context.push('/export'),
+          ),
         ],
       ),
     );

@@ -5,8 +5,11 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../data/models/invoice_model.dart';
 import '../../data/models/reminder_model.dart';
+import '../../providers/invoice_provider.dart';
 import '../../providers/reminder_provider.dart';
+import '../invoices/invoice_detail_screen.dart' show showAddReminderSheet;
 
 class RemindersScreen extends StatelessWidget {
   const RemindersScreen({super.key});
@@ -24,6 +27,11 @@ class RemindersScreen extends StatelessWidget {
               Tab(text: 'Passés'),
             ],
           ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => _showInvoicePicker(context),
+          tooltip: 'Nouveau rappel',
+          child: const Icon(Icons.add),
         ),
         body: StreamBuilder<List<ReminderModel>>(
           stream: context.read<ReminderProvider>().watchReminders(),
@@ -44,7 +52,7 @@ class RemindersScreen extends StatelessWidget {
                 _ReminderList(
                   reminders: upcoming,
                   emptyLabel: 'Aucun rappel à venir',
-                  emptyHint: 'Ouvrez une facture et appuyez sur 🔔 pour créer un rappel.',
+                  emptyHint: 'Appuyez sur + pour créer un rappel.',
                 ),
                 _ReminderList(
                   reminders: past,
@@ -54,6 +62,115 @@ class RemindersScreen extends StatelessWidget {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  void _showInvoicePicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollCtrl) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text(
+                'Choisir une facture',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                'Sélectionnez la facture pour laquelle créer un rappel',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: StreamBuilder<List<InvoiceModel>>(
+                stream: sheetCtx.read<InvoiceProvider>().watchInvoices(),
+                builder: (ctx, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final unpaid = (snap.data ?? [])
+                      .where((i) => !i.isFullyPaid)
+                      .toList();
+
+                  if (unpaid.isEmpty) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey),
+                            SizedBox(height: 12),
+                            Text(
+                              'Aucune facture en cours',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              'Créez d\'abord une facture depuis l\'onglet Factures.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    itemCount: unpaid.length,
+                    itemBuilder: (_, i) {
+                      final inv = unpaid[i];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            child: const Icon(Icons.receipt_long_outlined, color: AppColors.primary, size: 18),
+                          ),
+                          title: Text(
+                            inv.title,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(inv.clientName),
+                          trailing: Text(
+                            CurrencyFormatter.format(inv.remainingAmount),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.statusLate,
+                              fontSize: 13,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(sheetCtx);
+                            showAddReminderSheet(context, inv);
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

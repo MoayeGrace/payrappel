@@ -36,9 +36,17 @@ dependencies:
   timezone: ^0.9.4
   flutter_timezone: ^4.1.1
 
-  # PDF (utilisé plus tard)
+  # Partage et liens externes
+  url_launcher: ^6.3.0
+  share_plus: ^10.0.0
+  path_provider: ^2.1.4
+
+  # PDF
   pdf: ^3.11.1
   printing: ^5.13.1
+
+  # Excel
+  excel: ^4.0.6
 
 dev_dependencies:
   flutter_test:
