@@ -98,13 +98,15 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
           ),
         );
       } else {
-        await provider.addInvoice(
+        final newInvoice = await provider.addInvoice(
           clientId: _selectedClientId!,
           clientName: _selectedClientName!,
           title: _titleCtrl.text.trim(),
           totalAmount: amount,
           dueDate: _dueDate,
         );
+        if (mounted) context.go('/invoices/${newInvoice.id}');
+        return;
       }
       if (mounted) context.pop();
     } catch (e) {

@@ -1,1 +1,22 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"payrappel-8189c","appId":"1:246002567225:android:3bcd7d03bf3e06c2eb25e8","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"payrappel-8189c","configurations":{"android":"1:246002567225:android:3bcd7d03bf3e06c2eb25e8","ios":"1:246002567225:ios:94138feed482a333eb25e8"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "payrappel-8189c",
+          "appId": "1:246002567225:android:3bcd7d03bf3e06c2eb25e8",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "payrappel-8189c",
+          "configurations": {
+            "android": "1:246002567225:android:3bcd7d03bf3e06c2eb25e8",
+            "ios": "1:246002567225:ios:94138feed482a333eb25e8"
+          }
+        }
+      }
+    }
+  }
+}

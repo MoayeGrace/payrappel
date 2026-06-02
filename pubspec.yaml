@@ -48,6 +48,9 @@ dependencies:
   # Excel
   excel: ^4.0.6
 
+  # Sélection d'image (logo entreprise)
+  image_picker: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

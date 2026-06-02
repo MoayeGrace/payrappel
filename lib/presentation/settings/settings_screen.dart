@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../data/repositories/auth_repository.dart';
-import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -15,59 +14,28 @@ class SettingsScreen extends StatelessWidget {
     final isGuest = authRepo.isAnonymous;
     final email = authRepo.currentUser?.email ?? '';
     final themeProvider = context.watch<ThemeProvider>();
-    final sub = context.watch<SubscriptionProvider>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Paramètres')),
       body: ListView(
         children: [
-          // ── Abonnement ──────────────────────────────────────────────────────
-          const _SectionHeader('Abonnement'),
-          sub.isPro
-              ? ListTile(
-                  leading: const Icon(Icons.workspace_premium, color: Color(0xFF34A853)),
-                  title: const Text(
-                    'PayRappel Pro',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF34A853),
-                    ),
-                  ),
-                  subtitle: sub.user?.proExpiry != null
-                      ? Text(
-                          'Valide jusqu\'au ${_formatDate(sub.user!.proExpiry!)}',
-                          style: const TextStyle(fontSize: 12),
-                        )
-                      : const Text('Abonnement actif'),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF34A853).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Pro',
-                      style: TextStyle(
-                        color: Color(0xFF34A853),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                )
-              : ListTile(
-                  leading: const Icon(Icons.workspace_premium_outlined, color: Color(0xFF1A73E8)),
-                  title: const Text('Passer au Pro'),
-                  subtitle: const Text('Débloquez PDF, Excel, clients illimités'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/upgrade'),
-                ),
+          // ── Mon entreprise ───────────────────────────────────────────────────
+          const _SectionHeader('Mon entreprise'),
+          ListTile(
+            leading: const Icon(Icons.business_outlined),
+            title: const Text('Profil entreprise'),
+            subtitle: const Text('Logo, coordonnées, infos bancaires'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/settings/business'),
+          ),
 
           // ── Apparence ───────────────────────────────────────────────────────
           const _SectionHeader('Apparence'),
           SwitchListTile(
             secondary: Icon(
-              themeProvider.isDark ? Icons.dark_mode : Icons.light_mode_outlined,
+              themeProvider.isDark
+                  ? Icons.dark_mode
+                  : Icons.light_mode_outlined,
             ),
             title: const Text('Mode sombre'),
             value: themeProvider.isDark,
@@ -86,7 +54,8 @@ class SettingsScreen extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.lock_reset_outlined),
               title: const Text('Réinitialiser le mot de passe'),
-              subtitle: const Text('Un lien de réinitialisation vous sera envoyé'),
+              subtitle:
+                  const Text('Un lien de réinitialisation vous sera envoyé'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _resetPassword(context, email, authRepo),
             ),
@@ -98,7 +67,8 @@ class SettingsScreen extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.person_add_outlined),
               title: const Text('Créer un compte'),
-              subtitle: const Text('Sauvegardez vos données de manière permanente'),
+              subtitle: const Text(
+                  'Sauvegardez vos données de manière permanente'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/register'),
             ),
@@ -116,8 +86,8 @@ class SettingsScreen extends StatelessWidget {
           // ── Zone de danger ──────────────────────────────────────────────────
           const _SectionHeader('Zone de danger'),
           ListTile(
-            leading:
-                const Icon(Icons.delete_forever_outlined, color: Colors.red),
+            leading: const Icon(Icons.delete_forever_outlined,
+                color: Colors.red),
             title: const Text('Supprimer le compte',
                 style: TextStyle(color: Colors.red)),
             subtitle: const Text(
@@ -130,22 +100,21 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
   Future<void> _confirmLogout(
       BuildContext context, AuthRepository authRepo) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Déconnexion'),
-        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+        content:
+            const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
         actions: [
           TextButton(
               onPressed: () => ctx.pop(false),
               child: const Text('Annuler')),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            style:
+                TextButton.styleFrom(foregroundColor: Colors.orange),
             onPressed: () => ctx.pop(true),
             child: const Text('Déconnecter'),
           ),
@@ -246,7 +215,8 @@ class SettingsScreen extends StatelessWidget {
                   onPressed: () => ctx.pop(false),
                   child: const Text('Annuler')),
               TextButton(
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                style:
+                    TextButton.styleFrom(foregroundColor: Colors.red),
                 onPressed: () {
                   if (passwordCtrl.text.isEmpty) {
                     setState(() => fieldError = 'Requis');
@@ -270,8 +240,8 @@ class SettingsScreen extends StatelessWidget {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                  content:
-                      Text(e.message ?? 'Erreur lors de la suppression')),
+                  content: Text(
+                      e.message ?? 'Erreur lors de la suppression')),
             );
           }
         }

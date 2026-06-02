@@ -13,7 +13,7 @@ import '../../providers/client_provider.dart';
 import '../../providers/invoice_provider.dart';
 import '../../providers/payment_provider.dart';
 import '../../providers/reminder_provider.dart';
-import '../../providers/subscription_provider.dart';
+import '../../providers/business_profile_provider.dart';
 import '../../services/pdf_service.dart';
 import 'invoices_screen.dart' show statusColor, statusLabel;
 
@@ -519,14 +519,10 @@ class _InvoiceDetailView extends StatelessWidget {
   }
 
   Future<void> _exportPdf(BuildContext context) async {
-    final isPro = context.read<SubscriptionProvider>().isPro;
-    if (!isPro) {
-      context.push('/upgrade', extra: 'pdf');
-      return;
-    }
     final messenger = ScaffoldMessenger.of(context);
     final clientProvider = context.read<ClientProvider>();
     final paymentProvider = context.read<PaymentProvider>();
+    final profile = context.read<BusinessProfileProvider>().profile;
     messenger.showSnackBar(const SnackBar(content: Text('Génération du PDF…')));
     try {
       final client = await clientProvider.getClient(invoice.clientId);
@@ -534,6 +530,7 @@ class _InvoiceDetailView extends StatelessWidget {
       final bytes = await PdfService.generateInvoicePdf(
         invoice: invoice,
         payments: payments,
+        profile: profile,
         clientPhone: client?.phone,
         clientEmail: client?.email,
       );
@@ -699,6 +696,8 @@ class _InvoiceDetailView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSizes.paddingMedium),
+          _SendToClientCard(invoice: invoice, onExportPdf: () => _exportPdf(context)),
+          const SizedBox(height: AppSizes.paddingMedium),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -718,6 +717,87 @@ class _InvoiceDetailView extends StatelessWidget {
           _PaymentList(invoiceId: invoice.id),
           const SizedBox(height: 80),
         ],
+      ),
+    );
+  }
+}
+
+class _SendToClientCard extends StatelessWidget {
+  final InvoiceModel invoice;
+  final VoidCallback onExportPdf;
+
+  const _SendToClientCard({required this.invoice, required this.onExportPdf});
+
+  Future<void> _whatsApp(BuildContext context) async {
+    final clientProvider = context.read<ClientProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final client = await clientProvider.getClient(invoice.clientId);
+    final phone = client?.phone ?? '';
+    if (phone.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Numéro de téléphone manquant pour ce client')),
+      );
+      return;
+    }
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final message =
+        'Bonjour ${invoice.clientName}, nous vous rappelons qu\'il vous reste '
+        '${CurrencyFormatter.format(invoice.remainingAmount)} FCFA à régler pour '
+        '"${invoice.title}". Merci.';
+    final uri = Uri.parse('https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Impossible d\'ouvrir WhatsApp')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSizes.paddingMedium),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Envoyer au client',
+              style: TextStyle(fontSize: AppSizes.fontMedium, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _whatsApp(context),
+                    icon: const Icon(Icons.send_outlined, size: 18, color: Color(0xFF25D366)),
+                    label: const Text('WhatsApp'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF25D366),
+                      side: const BorderSide(color: Color(0xFF25D366)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onExportPdf,
+                    icon: const Icon(
+                      Icons.picture_as_pdf_outlined,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    label: const Text('PDF'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

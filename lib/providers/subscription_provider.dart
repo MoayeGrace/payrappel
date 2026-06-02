@@ -10,11 +10,10 @@ class SubscriptionProvider extends ChangeNotifier {
   StreamSubscription? _userSub;
   StreamSubscription? _authSub;
 
-  static const int maxFreeClients = 30;
-  static const int freeHistoryMonths = 3;
-
   UserModel? get user => _user;
-  bool get isPro => _user?.isProActive ?? false;
+
+  // Tout est gratuit — pas de limite, pas de Pro
+  bool get isPro => true;
 
   SubscriptionProvider() {
     _authSub = FirebaseAuth.instance.authStateChanges().listen((firebaseUser) {
@@ -36,15 +35,6 @@ class SubscriptionProvider extends ChangeNotifier {
         }
       });
     });
-  }
-
-  bool canAddClient(int currentCount) => isPro || currentCount < maxFreeClients;
-
-  // Filtre la date limite pour l'historique gratuit
-  DateTime? get freeHistoryCutoff {
-    if (isPro) return null;
-    final now = DateTime.now();
-    return DateTime(now.year, now.month - freeHistoryMonths, now.day);
   }
 
   @override

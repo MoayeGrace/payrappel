@@ -1,15 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../core/constants/app_colors.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../providers/client_provider.dart';
 import '../../providers/invoice_provider.dart';
 import '../../providers/payment_provider.dart';
-import '../../providers/subscription_provider.dart';
 import '../../services/excel_service.dart';
 
 class ExportScreen extends StatefulWidget {
@@ -32,31 +29,8 @@ class _ExportScreenState extends State<ExportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isPro = context.watch<SubscriptionProvider>().isPro;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Export Excel'),
-        actions: [
-          if (isPro)
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.statusPaid.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Pro',
-                style: TextStyle(
-                  color: AppColors.statusPaid,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Export Excel')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -102,60 +76,38 @@ class _ExportScreenState extends State<ExportScreen> {
             height: 52,
             child: FilledButton.icon(
               icon: _loading
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.download_outlined),
               label: Text(
                 _loading ? 'Génération...' : 'Générer et partager',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold),
               ),
-              onPressed: _loading || (!_inclInvoices && !_inclPayments && !_inclClients && !_inclStats)
+              onPressed: _loading ||
+                      (!_inclInvoices &&
+                          !_inclPayments &&
+                          !_inclClients &&
+                          !_inclStats)
                   ? null
-                  : () => _generate(context, isPro),
+                  : () => _generate(context),
             ),
           ),
-          const SizedBox(height: 12),
-          if (!isPro)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.07),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.lock_outlined, color: AppColors.primary, size: 18),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Passez au Pro pour exporter vos données.',
-                      style: TextStyle(color: AppColors.primary, fontSize: 13),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => context.push('/upgrade'),
-                    child: const Text('Upgrade'),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
   }
 
-  Future<void> _generate(BuildContext context, bool isPro) async {
-    if (!isPro) {
-      context.push('/upgrade', extra: 'excel');
-      return;
-    }
-
+  Future<void> _generate(BuildContext context) async {
     setState(() => _loading = true);
 
-    // Capturer les providers avant les await
     final invoiceProvider = context.read<InvoiceProvider>();
     final paymentProvider = context.read<PaymentProvider>();
     final clientProvider = context.read<ClientProvider>();
+    final messenger = ScaffoldMessenger.of(context);
 
     try {
       final invoices = await invoiceProvider.watchInvoices().first;
@@ -186,14 +138,10 @@ class _ExportScreenState extends State<ExportScreen> {
       final file = File('${dir.path}/$filename');
       await file.writeAsBytes(bytes);
 
-      // share_plus v10: API Share.shareXFiles
       await Share.shareXFiles([XFile(file.path)], text: 'Export PayRappel');
     } catch (e) {
       if (mounted) {
-        // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur : $e')),
-        );
+        messenger.showSnackBar(SnackBar(content: Text('Erreur : $e')));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -323,13 +271,17 @@ class _CheckOption extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: CheckboxListTile(
-        secondary: Icon(icon, color: value ? AppColors.primary : Colors.grey),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+        secondary: Icon(icon,
+            color: value ? const Color(0xFF1A73E8) : Colors.grey),
+        title: Text(label,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle:
+            Text(subtitle, style: const TextStyle(fontSize: 12)),
         value: value,
-        activeColor: AppColors.primary,
+        activeColor: const Color(0xFF1A73E8),
         onChanged: (v) => onChanged(v ?? false),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
     );
   }
