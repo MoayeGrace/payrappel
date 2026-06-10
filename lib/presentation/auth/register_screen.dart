@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_sizes.dart';
 import '../../data/repositories/auth_repository.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -71,134 +70,300 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isGuest = _authRepo.isAnonymous;
+  final isGuest = _authRepo.isAnonymous;
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
+  return Scaffold(
+    backgroundColor: const Color(0xFFF8FAFC),
+    body: Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFF4F9FF),
+            Color(0xFFFFFFFF),
+          ],
         ),
       ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSizes.paddingLarge),
-            child: Column(
-              children: [
-                Text(
-                  isGuest ? 'Sauvegarder mes données' : 'Créer un compte',
-                  style: const TextStyle(
-                    fontSize: AppSizes.fontXXL,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 12,
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => context.pop(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSizes.paddingSmall),
-                Text(
-                  isGuest
-                      ? 'Créez un compte pour ne pas perdre vos données'
-                      : 'Rejoignez PayRappel gratuitement',
-                  style: const TextStyle(
-                    fontSize: AppSizes.fontMedium,
-                    color: AppColors.textSecondary,
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // HEADER
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF1A73E8),
+                      Color(0xFF34A853),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x331A73E8),
+                      blurRadius: 25,
+                      offset: Offset(0, 12),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSizes.paddingXL),
-                Form(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.person_add_alt_1_rounded,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    Text(
+                      isGuest
+                          ? "Sauvegarder mes données"
+                          : "Créer un compte",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Text(
+                      isGuest
+                          ? "Créez un compte pour conserver toutes vos données"
+                          : "Rejoignez PayRappel gratuitement",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              // FORM CARD
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 25,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Form(
                   key: _formKey,
                   child: Column(
                     children: [
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.email_outlined),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          hintText: "Adresse email",
+                          prefixIcon:
+                              const Icon(Icons.email_outlined),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
                         ),
                         validator: (v) =>
-                            v == null || v.isEmpty ? 'Email requis' : null,
+                            v == null || v.isEmpty
+                                ? 'Email requis'
+                                : null,
                       ),
-                      const SizedBox(height: AppSizes.paddingMedium),
+
+                      const SizedBox(height: 18),
+
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
-                          labelText: 'Mot de passe',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          border: const OutlineInputBorder(),
+                          hintText: "Mot de passe",
+                          prefixIcon:
+                              const Icon(Icons.lock_outline),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
                           suffixIcon: IconButton(
-                            icon: Icon(_obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined),
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
                             onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword),
+                              () => _obscurePassword =
+                                  !_obscurePassword,
+                            ),
                           ),
                         ),
-                        validator: (v) => v == null || v.length < 6
-                            ? 'Minimum 6 caractères'
-                            : null,
+                        validator: (v) =>
+                            v == null || v.length < 6
+                                ? 'Minimum 6 caractères'
+                                : null,
                       ),
-                      const SizedBox(height: AppSizes.paddingMedium),
+
+                      const SizedBox(height: 18),
+
                       TextFormField(
                         controller: _confirmPasswordController,
                         obscureText: _obscurePassword,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirmer le mot de passe',
-                          prefixIcon: Icon(Icons.lock_outline),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          hintText: "Confirmer le mot de passe",
+                          prefixIcon:
+                              const Icon(Icons.verified_user_outlined),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
                         ),
-                        validator: (v) => v != _passwordController.text
-                            ? 'Les mots de passe ne correspondent pas'
-                            : null,
+                        validator: (v) =>
+                            v != _passwordController.text
+                                ? 'Les mots de passe ne correspondent pas'
+                                : null,
                       ),
-                      const SizedBox(height: AppSizes.paddingLarge),
+
+                      const SizedBox(height: 28),
+
                       SizedBox(
                         width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _register,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                  AppSizes.radiusMedium),
+                        height: 56,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius:
+                                BorderRadius.circular(18),
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF1A73E8),
+                                Color(0xFF34A853),
+                              ],
                             ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x331A73E8),
+                                blurRadius: 18,
+                                offset: Offset(0, 8),
+                              ),
+                            ],
                           ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
+                          child: ElevatedButton(
+                            onPressed:
+                                _isLoading ? null : _register,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  Colors.transparent,
+                              shadowColor:
+                                  Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: _isLoading
+                                ? const CircularProgressIndicator(
                                     color: Colors.white,
-                                    strokeWidth: 2,
+                                  )
+                                : Text(
+                                    isGuest
+                                        ? "Sauvegarder et créer mon compte"
+                                        : "Créer mon compte",
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight:
+                                          FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                )
-                              : Text(
-                                  isGuest
-                                      ? 'Sauvegarder et créer mon compte'
-                                      : 'Créer mon compte',
-                                  style: const TextStyle(
-                                    fontSize: AppSizes.fontLarge,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+
+              const SizedBox(height: 24),
+
+              Row(
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "Déjà un compte ? ",
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => context.pop(),
+                    child: const Text(
+                      "Se connecter",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

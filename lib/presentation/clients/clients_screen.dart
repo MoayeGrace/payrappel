@@ -13,15 +13,38 @@ class ClientsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Clients'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Nouveau client',
-            onPressed: () => context.push('/clients/add'),
+  elevation: 0,
+  backgroundColor: Colors.transparent,
+  centerTitle: false,
+  title: const Text(
+    "Clients",
+    style: TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.bold,
+      color: AppColors.textPrimary,
+    ),
+  ),
+  actions: [
+    Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF1A73E8),
+              Color(0xFF34A853),
+            ],
           ),
-        ],
+        ),
+        child: IconButton(
+          icon: const Icon(Icons.add,color: Colors.white),
+          onPressed: () => context.push('/clients/add'),
+        ),
       ),
+    ),
+  ],
+),
       body: Column(
         children: [
           _SearchBar(),
@@ -35,21 +58,36 @@ class ClientsScreen extends StatelessWidget {
 class _SearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSizes.paddingMedium),
-      child: TextField(
-        decoration: InputDecoration(
-          hintText: 'Rechercher un client...',
-          prefixIcon: const Icon(Icons.search),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-          ),
-          filled: true,
-          fillColor: Colors.grey[100],
-        ),
-        onChanged: (v) => context.read<ClientProvider>().setSearchQuery(v),
+    return Container(
+  margin: const EdgeInsets.all(20),
+  decoration: BoxDecoration(
+    color: Theme.of(context).colorScheme.surface,
+    borderRadius: BorderRadius.circular(20),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.05),
+        blurRadius: 20,
+        offset: const Offset(0, 8),
       ),
-    );
+    ],
+  ),
+  child: TextField(
+    decoration: InputDecoration(
+      hintText: "Rechercher un client",
+      prefixIcon: const Icon(
+        Icons.search,
+        color: AppColors.primary,
+      ),
+      border: InputBorder.none,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: 18,
+      ),
+    ),
+    onChanged: (v) =>
+        context.read<ClientProvider>().setSearchQuery(v),
+  ),
+);
   }
 }
 
@@ -118,30 +156,107 @@ class _ClientList extends StatelessWidget {
 
 class _ClientTile extends StatelessWidget {
   final ClientModel client;
-  const _ClientTile({required this.client});
+
+  const _ClientTile({
+    required this.client,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSizes.paddingSmall),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppColors.primary.withOpacity(0.1),
-          child: Text(
-            client.name.isNotEmpty ? client.name[0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () =>
+              context.push('/clients/${client.id}'),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF1A73E8),
+                        Color(0xFF34A853),
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      client.name.isNotEmpty
+                          ? client.name[0].toUpperCase()
+                          : "?",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 22,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 16),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        client.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17,
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      Text(
+                        client.phone,
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius:
+                        BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-        title: Text(
-          client.name,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(client.phone),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push('/clients/${client.id}'),
       ),
     );
   }

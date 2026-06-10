@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
@@ -34,6 +33,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     setState(() => _loading = true);
     final client =
         await context.read<ClientProvider>().getClient(widget.clientId);
+
     if (mounted) {
       setState(() {
         _client = client;
@@ -51,6 +51,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Supprimer ce client ?'),
         content: const Text('Cette action est irréversible.'),
         actions: [
@@ -76,65 +77,99 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF1E88E5)),
+        ),
+      );
     }
+
     if (_client == null) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: Text('Client introuvable')),
+      return const Scaffold(
+        body: Center(child: Text('Client introuvable')),
       );
     }
 
     final client = _client!;
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF3F7FA),
+
+      // 🔵 AppBar premium
       appBar: AppBar(
-        title: Text(client.name),
+        elevation: 0,
+        backgroundColor: const Color(0xFF1E88E5),
+        foregroundColor: Colors.white,
+        title: Text(
+          client.name,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Actualiser',
             onPressed: _refresh,
           ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Modifier',
             onPressed: () =>
                 context.push('/clients/${client.id}/edit', extra: client),
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
-            tooltip: 'Supprimer',
+            icon: const Icon(Icons.delete_outline, color: Colors.white),
             onPressed: _confirmDelete,
           ),
         ],
       ),
+
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.paddingLarge),
         children: [
           _ClientInfoCard(client: client),
-          const SizedBox(height: AppSizes.paddingLarge),
+
+          const SizedBox(height: 20),
+
+          // Header section factures
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 'Factures',
                 style: TextStyle(
-                  fontSize: AppSizes.fontLarge,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              TextButton.icon(
-                onPressed: () => context.push(
-                  '/invoices/add',
-                  extra: {'clientId': client.id, 'clientName': client.name},
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1E88E5), Color(0xFF00C6A2)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Nouvelle'),
+                child: TextButton.icon(
+                  onPressed: () => context.push(
+                    '/invoices/add',
+                    extra: {
+                      'clientId': client.id,
+                      'clientName': client.name
+                    },
+                  ),
+                  icon: const Icon(Icons.add, color: Colors.white, size: 18),
+                  label: const Text(
+                    'Nouvelle',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: AppSizes.paddingSmall),
-          _ClientInvoiceList(key: ValueKey(_refreshKey), clientId: client.id),
+
+          const SizedBox(height: 12),
+
+          _ClientInvoiceList(
+            key: ValueKey(_refreshKey),
+            clientId: client.id,
+          ),
         ],
       ),
     );
@@ -148,53 +183,30 @@ class _ClientInvoiceList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<InvoiceModel>>(
-      stream:
-          context.read<InvoiceProvider>().watchInvoicesByClient(clientId),
+      stream: context.read<InvoiceProvider>().watchInvoicesByClient(clientId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+
         if (snapshot.hasError) {
-          return Container(
-            padding: const EdgeInsets.all(AppSizes.paddingLarge),
-            decoration: BoxDecoration(
-              color: Colors.red[50],
-              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.red),
-                SizedBox(width: AppSizes.paddingSmall),
-                Expanded(
-                  child: Text(
-                    'Erreur de chargement des factures.',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                ),
-              ],
-            ),
+          return _EmptyState(
+            icon: Icons.error_outline,
+            text: "Erreur de chargement des factures",
+            color: Colors.red,
           );
         }
+
         final invoices = snapshot.data ?? [];
+
         if (invoices.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(AppSizes.paddingLarge),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.receipt_long_outlined, color: Colors.grey),
-                SizedBox(width: AppSizes.paddingSmall),
-                Text(
-                  'Aucune facture pour ce client',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
+          return const _EmptyState(
+            icon: Icons.receipt_long_outlined,
+            text: "Aucune facture pour ce client",
+            color: Colors.grey,
           );
         }
+
         return Column(
           children: invoices
               .map((invoice) => _InvoiceSummaryTile(invoice: invoice))
@@ -212,33 +224,41 @@ class _InvoiceSummaryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = statusColor(invoice.status);
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSizes.paddingSmall),
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: color.withOpacity(0.12),
-          radius: 20,
           child: Icon(Icons.receipt_long_outlined, color: color, size: 18),
         ),
         title: Text(
           invoice.title,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: AppSizes.fontMedium),
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Row(
           children: [
             StatusChip(status: invoice.status),
             const SizedBox(width: 8),
-            Text(
-              DateFormatter.format(invoice.dueDate),
-              style: const TextStyle(fontSize: AppSizes.fontSmall),
-            ),
+            Text(DateFormatter.format(invoice.dueDate)),
           ],
         ),
         trailing: Text(
           CurrencyFormatter.format(invoice.totalAmount),
           style: const TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: AppSizes.fontMedium,
+            color: Color(0xFF1E88E5),
           ),
         ),
         onTap: () => context.push('/invoices/${invoice.id}'),
@@ -253,75 +273,80 @@ class _ClientInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSizes.paddingLarge),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
-                  child: Text(
-                    client.name.isNotEmpty
-                        ? client.name[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(
-                      fontSize: AppSizes.fontXL,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSizes.paddingMedium),
-                Expanded(
-                  child: Text(
-                    client.name,
-                    style: const TextStyle(
-                      fontSize: AppSizes.fontXL,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 32),
-            _InfoRow(icon: Icons.phone, value: client.phone),
-            if (client.email.isNotEmpty) ...[
-              const SizedBox(height: AppSizes.paddingSmall),
-              _InfoRow(icon: Icons.email_outlined, value: client.email),
-            ],
-            if (client.note.isNotEmpty) ...[
-              const SizedBox(height: AppSizes.paddingSmall),
-              _InfoRow(icon: Icons.note_outlined, value: client.note),
-            ],
-          ],
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E88E5), Color(0xFF00C6A2)],
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                child: Text(
+                  client.name.isNotEmpty ? client.name[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  client.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(client.phone, style: const TextStyle(color: Colors.white70)),
+          if (client.email.isNotEmpty)
+            Text(client.email, style: const TextStyle(color: Colors.white70)),
+        ],
       ),
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
+class _EmptyState extends StatelessWidget {
   final IconData icon;
-  final String value;
-  const _InfoRow({required this.icon, required this.value});
+  final String text;
+  final Color color;
+
+  const _EmptyState({
+    required this.icon,
+    required this.text,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: Colors.grey[600]),
-        const SizedBox(width: AppSizes.paddingSmall),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: AppSizes.fontMedium),
-          ),
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text)),
+        ],
+      ),
     );
   }
 }

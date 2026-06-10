@@ -24,25 +24,100 @@ class _ExportScreenState extends State<ExportScreen> {
   bool _inclPayments = true;
   bool _inclClients = false;
   bool _inclStats = true;
-
   bool _loading = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Export Excel')),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: const Color(0xFF1A73E8),
+        foregroundColor: Colors.white,
+        title: const Text(
+          'Export Excel',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _SectionHeader('Période'),
-          _DateRangeSelector(
-            from: _from,
-            to: _to,
-            onFromChanged: (d) => setState(() => _from = d),
-            onToChanged: (d) => setState(() => _to = d),
+          // Bandeau info
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1565C0), Color(0xFF00BFA5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.table_chart_outlined,
+                      color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Exporter vos données',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Générez un fichier Excel à partager',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
+
           const SizedBox(height: 20),
-          const _SectionHeader('Données à inclure'),
+
+          _SectionLabel('Période'),
+          _WhiteCard(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _DatePick(
+                    label: 'Du',
+                    date: _from,
+                    onPicked: (d) => setState(() => _from = d),
+                    lastDate: _to,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DatePick(
+                    label: 'Au',
+                    date: _to,
+                    onPicked: (d) => setState(() => _to = d),
+                    firstDate: _from,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          _SectionLabel('Données à inclure'),
           _CheckOption(
             label: 'Factures',
             subtitle: 'Titre, client, montants, statut, date',
@@ -71,29 +146,54 @@ class _ExportScreenState extends State<ExportScreen> {
             value: _inclStats,
             onChanged: (v) => setState(() => _inclStats = v),
           ),
+
           const SizedBox(height: 28),
+
           SizedBox(
-            height: 52,
-            child: FilledButton.icon(
-              icon: _loading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.download_outlined),
-              label: Text(
-                _loading ? 'Génération...' : 'Générer et partager',
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold),
+            height: 54,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1A73E8), Color(0xFF00BFA5)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1A73E8).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              onPressed: _loading ||
-                      (!_inclInvoices &&
-                          !_inclPayments &&
-                          !_inclClients &&
-                          !_inclStats)
-                  ? null
-                  : () => _generate(context),
+              child: ElevatedButton.icon(
+                icon: _loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.download_outlined),
+                label: Text(
+                  _loading ? 'Génération...' : 'Générer et partager',
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                onPressed: _loading ||
+                        (!_inclInvoices &&
+                            !_inclPayments &&
+                            !_inclClients &&
+                            !_inclStats)
+                    ? null
+                    : () => _generate(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
             ),
           ),
         ],
@@ -103,7 +203,6 @@ class _ExportScreenState extends State<ExportScreen> {
 
   Future<void> _generate(BuildContext context) async {
     setState(() => _loading = true);
-
     final invoiceProvider = context.read<InvoiceProvider>();
     final paymentProvider = context.read<PaymentProvider>();
     final clientProvider = context.read<ClientProvider>();
@@ -134,7 +233,7 @@ class _ExportScreenState extends State<ExportScreen> {
 
       final dir = await getTemporaryDirectory();
       final filename =
-          'payrappel_export_${_from.year}${_from.month.toString().padLeft(2, '0')}_${_to.year}${_to.month.toString().padLeft(2, '0')}.xlsx';
+          'payrappel_${_from.year}${_from.month.toString().padLeft(2, '0')}_${_to.year}${_to.month.toString().padLeft(2, '0')}.xlsx';
       final file = File('${dir.path}/$filename');
       await file.writeAsBytes(bytes);
 
@@ -149,16 +248,16 @@ class _ExportScreenState extends State<ExportScreen> {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader(this.title);
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
-        title.toUpperCase(),
+        text.toUpperCase(),
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
@@ -170,41 +269,25 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _DateRangeSelector extends StatelessWidget {
-  final DateTime from;
-  final DateTime to;
-  final ValueChanged<DateTime> onFromChanged;
-  final ValueChanged<DateTime> onToChanged;
-
-  const _DateRangeSelector({
-    required this.from,
-    required this.to,
-    required this.onFromChanged,
-    required this.onToChanged,
-  });
+class _WhiteCard extends StatelessWidget {
+  final Widget child;
+  const _WhiteCard({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _DatePick(
-            label: 'Du',
-            date: from,
-            onPicked: onFromChanged,
-            lastDate: to,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _DatePick(
-            label: 'Au',
-            date: to,
-            onPicked: onToChanged,
-            firstDate: from,
-          ),
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: child,
     );
   }
 }
@@ -237,14 +320,31 @@ class _DatePick extends StatelessWidget {
         );
         if (picked != null) onPicked(picked);
       },
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          suffixIcon: const Icon(Icons.calendar_today_outlined, size: 16),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: Text(
-          DateFormatter.format(date),
-          style: const TextStyle(fontSize: 13),
+        child: Row(
+          children: [
+            const Icon(Icons.calendar_today_outlined,
+                size: 14, color: Color(0xFF1A73E8)),
+            const SizedBox(width: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                Text(
+                  DateFormatter.format(date),
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -268,20 +368,40 @@ class _CheckOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    const blue = Color(0xFF1A73E8);
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: value ? blue.withOpacity(0.3) : Colors.transparent,
+        ),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
+        ],
+      ),
       child: CheckboxListTile(
-        secondary: Icon(icon,
-            color: value ? const Color(0xFF1A73E8) : Colors.grey),
-        title: Text(label,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle:
-            Text(subtitle, style: const TextStyle(fontSize: 12)),
+        secondary: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: value ? blue.withOpacity(0.1) : Colors.grey[100],
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: value ? blue : Colors.grey, size: 20),
+        ),
+        title:
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
         value: value,
-        activeColor: const Color(0xFF1A73E8),
+        activeColor: blue,
         onChanged: (v) => onChanged(v ?? false),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }

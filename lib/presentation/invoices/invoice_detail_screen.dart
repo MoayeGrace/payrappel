@@ -2,21 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_sizes.dart';
+
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../data/models/invoice_model.dart';
 import '../../data/models/payment_model.dart';
 import '../../data/models/reminder_model.dart';
-import '../../providers/client_provider.dart';
 import '../../providers/invoice_provider.dart';
 import '../../providers/payment_provider.dart';
+import '../../providers/client_provider.dart';
 import '../../providers/reminder_provider.dart';
 import '../../providers/business_profile_provider.dart';
 import '../../services/pdf_service.dart';
-import 'invoices_screen.dart' show statusColor, statusLabel;
+import 'invoices_screen.dart' show statusLabel;
 
+// ── Point d'entrée ─────────────────────────────────────────────────────────────
 class InvoiceDetailScreen extends StatelessWidget {
   final String invoiceId;
   const InvoiceDetailScreen({super.key, required this.invoiceId});
@@ -27,11 +27,16 @@ class InvoiceDetailScreen extends StatelessWidget {
       stream: context.read<InvoiceProvider>().watchInvoice(invoiceId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator(color: Color(0xFF1A73E8))),
+          );
         }
         final invoice = snapshot.data;
         if (invoice == null) {
-          return Scaffold(appBar: AppBar(), body: const Center(child: Text('Facture introuvable')));
+          return Scaffold(
+            appBar: AppBar(title: const Text('Facture')),
+            body: const Center(child: Text('Facture introuvable')),
+          );
         }
         return _InvoiceDetailView(invoice: invoice);
       },
@@ -39,494 +44,30 @@ class InvoiceDetailScreen extends StatelessWidget {
   }
 }
 
-Future<void> _showAddPaymentSheet(BuildContext context, InvoiceModel invoice) async {
-  final amountCtrl = TextEditingController();
-  final noteCtrl = TextEditingController();
-  var selectedDate = DateTime.now();
-  final formKey = GlobalKey<FormState>();
-  bool submitting = false;
-
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (sheetCtx) => StatefulBuilder(
-      builder: (sheetCtx, setSheetState) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          24,
-          24,
-          MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
-        ),
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Enregistrer un paiement',
-                style: TextStyle(fontSize: AppSizes.fontLarge, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Restant : ${CurrencyFormatter.format(invoice.remainingAmount)}',
-                style: const TextStyle(fontSize: AppSizes.fontSmall, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: amountCtrl,
-                autofocus: true,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Montant (FCFA)'),
-                validator: (v) {
-                  final parsed = double.tryParse((v ?? '').replaceAll(',', '.'));
-                  if (parsed == null || parsed <= 0) return 'Montant invalide';
-                  if (parsed > invoice.remainingAmount + 0.01) return 'Dépasse le montant restant';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: noteCtrl,
-                decoration: const InputDecoration(labelText: 'Note (optionnel)'),
-              ),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: sheetCtx,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime.now(),
-                    locale: const Locale('fr', 'FR'),
-                  );
-                  if (picked != null) setSheetState(() => selectedDate = picked);
-                },
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Date du paiement',
-                    suffixIcon: Icon(Icons.calendar_today_outlined, size: 18),
-                  ),
-                  child: Text(DateFormatter.format(selectedDate)),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: submitting
-                      ? null
-                      : () async {
-                          if (!formKey.currentState!.validate()) return;
-                          setSheetState(() => submitting = true);
-                          final amount = double.parse(
-                            amountCtrl.text.replaceAll(',', '.'),
-                          );
-                          await context.read<PaymentProvider>().addPayment(
-                                invoiceId: invoice.id,
-                                invoiceTitle: invoice.title,
-                                clientId: invoice.clientId,
-                                amount: amount,
-                                note: noteCtrl.text.trim(),
-                                paidAt: selectedDate,
-                              );
-                          if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
-                        },
-                  child: submitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Confirmer'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-DateTime _computeReminderDate(
-  DateTime dueDate,
-  ReminderType type,
-  int days,
-  int hour,
-  int minute,
-) {
-  final base = switch (type) {
-    ReminderType.beforeDue => dueDate.subtract(Duration(days: days)),
-    ReminderType.onDue => dueDate,
-    ReminderType.afterDue => dueDate.add(Duration(days: days)),
-    ReminderType.custom => dueDate,
-  };
-  return DateTime(base.year, base.month, base.day, hour, minute);
-}
-
-Future<void> showAddReminderSheet(BuildContext context, InvoiceModel invoice) async {
-  var type = ReminderType.beforeDue;
-  var days = 3;
-  var hour = 9;
-  var minute = 0;
-  DateTime? customDate;
-  bool submitting = false;
-
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (sheetCtx) => StatefulBuilder(
-      builder: (sheetCtx, setSheetState) {
-        DateTime? scheduledAt;
-        if (type == ReminderType.custom) {
-          if (customDate != null) {
-            scheduledAt = DateTime(
-                customDate!.year, customDate!.month, customDate!.day, hour, minute);
-          }
-        } else {
-          scheduledAt =
-              _computeReminderDate(invoice.dueDate, type, days, hour, minute);
-        }
-        final isPast =
-            scheduledAt != null && scheduledAt.isBefore(DateTime.now());
-
-        return SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            24, 24, 24,
-            MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Créer un rappel',
-                style:
-                    TextStyle(fontSize: AppSizes.fontLarge, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${invoice.title} · ${CurrencyFormatter.format(invoice.remainingAmount)} restants',
-                style: const TextStyle(
-                    fontSize: AppSizes.fontSmall, color: AppColors.textSecondary),
-              ),
-              Text(
-                'Échéance : ${DateFormatter.format(invoice.dueDate)}',
-                style: const TextStyle(
-                    fontSize: AppSizes.fontSmall, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 16),
-              const Text('Quand envoyer ce rappel ?',
-                  style: TextStyle(fontWeight: FontWeight.w500)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _TypeChip(
-                    label: 'Avant',
-                    selected: type == ReminderType.beforeDue,
-                    onTap: () => setSheetState(() => type = ReminderType.beforeDue),
-                  ),
-                  _TypeChip(
-                    label: 'Le jour J',
-                    selected: type == ReminderType.onDue,
-                    onTap: () => setSheetState(() => type = ReminderType.onDue),
-                  ),
-                  _TypeChip(
-                    label: 'Après',
-                    selected: type == ReminderType.afterDue,
-                    onTap: () => setSheetState(() => type = ReminderType.afterDue),
-                  ),
-                  _TypeChip(
-                    label: 'Date libre',
-                    selected: type == ReminderType.custom,
-                    onTap: () =>
-                        setSheetState(() => type = ReminderType.custom),
-                  ),
-                ],
-              ),
-              if (type == ReminderType.custom) ...[
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: sheetCtx,
-                      initialDate: customDate ??
-                          DateTime.now().add(const Duration(days: 1)),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime(2035),
-                      locale: const Locale('fr', 'FR'),
-                    );
-                    if (picked != null) {
-                      setSheetState(() => customDate = picked);
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Choisir une date',
-                      suffixIcon:
-                          Icon(Icons.calendar_today_outlined, size: 18),
-                    ),
-                    child: Text(
-                      customDate != null
-                          ? DateFormatter.format(customDate!)
-                          : 'Appuyez pour choisir…',
-                      style: TextStyle(
-                        color: customDate == null ? Colors.grey : null,
-                      ),
-                    ),
-                  ),
-                ),
-              ] else if (type != ReminderType.onDue) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text(
-                      type == ReminderType.beforeDue
-                          ? 'Jours avant : '
-                          : 'Jours après : ',
-                      style: const TextStyle(fontSize: AppSizes.fontSmall),
-                    ),
-                    SizedBox(
-                      width: 60,
-                      child: TextFormField(
-                        initialValue: days.toString(),
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        decoration: const InputDecoration(isDense: true),
-                        onChanged: (v) {
-                          final parsed = int.tryParse(v);
-                          if (parsed != null && parsed > 0) {
-                            setSheetState(() => days = parsed);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ] else ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Le rappel sera envoyé le ${DateFormatter.format(invoice.dueDate)}',
-                  style: const TextStyle(
-                      fontSize: AppSizes.fontSmall,
-                      color: AppColors.textSecondary),
-                ),
-              ],
-              const SizedBox(height: 12),
-              InkWell(
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: sheetCtx,
-                    initialTime: TimeOfDay(hour: hour, minute: minute),
-                  );
-                  if (picked != null) {
-                    setSheetState(() {
-                      hour = picked.hour;
-                      minute = picked.minute;
-                    });
-                  }
-                },
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Heure de notification',
-                    suffixIcon: Icon(Icons.access_time, size: 18),
-                  ),
-                  child: Text(
-                    '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: (type == ReminderType.custom && customDate == null)
-                      ? Colors.grey[100]
-                      : isPast
-                          ? Colors.red[50]
-                          : Colors.deepPurple.withOpacity(0.07),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      (type == ReminderType.custom && customDate == null)
-                          ? Icons.info_outline
-                          : isPast
-                              ? Icons.warning_amber_outlined
-                              : Icons.event_outlined,
-                      size: 16,
-                      color: (type == ReminderType.custom && customDate == null)
-                          ? Colors.grey
-                          : isPast
-                              ? Colors.red
-                              : Colors.deepPurple,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        (type == ReminderType.custom && customDate == null)
-                            ? 'Choisissez une date dans le calendrier'
-                            : isPast
-                                ? type == ReminderType.onDue
-                                    ? 'La date d\'échéance est déjà passée — utilisez "Date libre" pour choisir une autre date'
-                                    : 'Cette date est déjà passée'
-                                : 'Rappel prévu le ${DateFormatter.format(scheduledAt!)} à ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
-                        style: TextStyle(
-                          fontSize: AppSizes.fontSmall,
-                          color: (type == ReminderType.custom && customDate == null)
-                              ? Colors.grey
-                              : isPast
-                                  ? Colors.red
-                                  : Colors.deepPurple,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: (submitting ||
-                          isPast ||
-                          scheduledAt == null)
-                      ? null
-                      : () async {
-                          setSheetState(() => submitting = true);
-                          await context.read<ReminderProvider>().addReminder(
-                                invoiceId: invoice.id,
-                                clientId: invoice.clientId,
-                                clientName: invoice.clientName,
-                                invoiceTitle: invoice.title,
-                                remainingAmount: invoice.remainingAmount,
-                                type: type,
-                                scheduledAt: scheduledAt!,
-                              );
-                          if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
-                        },
-                  child: submitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Créer le rappel'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    ),
-  );
-}
-
-class _TypeChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _TypeChip({required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? Colors.deepPurple : Colors.deepPurple.withOpacity(0.07),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: AppSizes.fontSmall,
-            color: selected ? Colors.white : Colors.deepPurple,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InvoiceDetailView extends StatelessWidget {
+// ── Vue principale ─────────────────────────────────────────────────────────────
+class _InvoiceDetailView extends StatefulWidget {
   final InvoiceModel invoice;
   const _InvoiceDetailView({required this.invoice});
 
-  Future<void> _confirmDelete(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer cette facture ?'),
-        content: const Text('Cette action est irréversible.'),
-        actions: [
-          TextButton(onPressed: () => ctx.pop(false), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () => ctx.pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && context.mounted) {
-      final invoiceProvider = context.read<InvoiceProvider>();
-      final messenger = ScaffoldMessenger.of(context);
-      context.pop();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Facture supprimée')),
-      );
-      await invoiceProvider.deleteInvoice(invoice.id);
-    }
-  }
+  @override
+  State<_InvoiceDetailView> createState() => _InvoiceDetailViewState();
+}
 
-  Future<void> _openWhatsApp(BuildContext context) async {
-    final clientProvider = context.read<ClientProvider>();
-    final messenger = ScaffoldMessenger.of(context);
-    final client = await clientProvider.getClient(invoice.clientId);
-    final phone = client?.phone ?? '';
-    if (phone.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Numéro de téléphone manquant pour ce client')),
-      );
-      return;
-    }
-    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
-    final message =
-        'Bonjour ${invoice.clientName}, nous vous rappelons qu\'il vous reste '
-        '${CurrencyFormatter.format(invoice.remainingAmount)} FCFA à régler pour '
-        '"${invoice.title}". Merci.';
-    final uri = Uri.parse('https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}');
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Impossible d\'ouvrir WhatsApp')),
-      );
-    }
-  }
+class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
+  bool _exportingPdf = false;
 
-  Future<void> _exportPdf(BuildContext context) async {
+  InvoiceModel get invoice => widget.invoice;
+
+  Future<void> _exportPdf() async {
+    setState(() => _exportingPdf = true);
     final messenger = ScaffoldMessenger.of(context);
     final clientProvider = context.read<ClientProvider>();
     final paymentProvider = context.read<PaymentProvider>();
     final profile = context.read<BusinessProfileProvider>().profile;
-    messenger.showSnackBar(const SnackBar(content: Text('Génération du PDF…')));
     try {
       final client = await clientProvider.getClient(invoice.clientId);
-      final payments = await paymentProvider.watchPaymentsByInvoice(invoice.id).first;
+      final payments =
+          await paymentProvider.watchPaymentsByInvoice(invoice.id).first;
       final bytes = await PdfService.generateInvoicePdf(
         invoice: invoice,
         payments: payments,
@@ -535,305 +76,386 @@ class _InvoiceDetailView extends StatelessWidget {
         clientEmail: client?.email,
       );
       await PdfService.sharePdf(
-          bytes, filename: 'facture_${invoice.title.replaceAll(' ', '_')}.pdf');
+        bytes,
+        filename: 'facture_${invoice.title.replaceAll(' ', '_')}.pdf',
+      );
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Erreur PDF : $e')));
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text('Erreur PDF : $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _exportingPdf = false);
+    }
+  }
+
+  Future<void> _openWhatsApp() async {
+    final client =
+        await context.read<ClientProvider>().getClient(invoice.clientId);
+    final phone = client?.phone ?? '';
+    if (phone.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Numéro de téléphone introuvable')),
+        );
+      }
+      return;
+    }
+    final msg =
+        'Bonjour ${invoice.clientName},\n\nVoici un rappel pour la facture "${invoice.title}".\n\nMontant restant : ${CurrencyFormatter.format(invoice.remainingAmount)}\nÉchéance : ${DateFormatter.format(invoice.dueDate)}\n\nMerci.';
+    final url = 'https://wa.me/$phone?text=${Uri.encodeComponent(msg)}';
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _confirmDelete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Supprimer cette facture ?'),
+        content: const Text('Cette action est irréversible.'),
+        actions: [
+          TextButton(
+              onPressed: () => ctx.pop(false), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () => ctx.pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      await context.read<InvoiceProvider>().deleteInvoice(invoice.id);
+      if (mounted) context.pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = statusColor(invoice.status);
     final ratio = invoice.totalAmount > 0
         ? (invoice.paidAmount / invoice.totalAmount).clamp(0.0, 1.0)
         : 0.0;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Facture'),
+        backgroundColor: const Color(0xFF1A73E8),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: const Text('Facture', style: TextStyle(fontWeight: FontWeight.w600)),
         actions: [
-          if (!invoice.isFullyPaid)
-            IconButton(
-              icon: const Icon(Icons.notification_add_outlined),
-              tooltip: 'Créer un rappel',
-              onPressed: () => showAddReminderSheet(context, invoice),
-            ),
           IconButton(
-            icon: const Icon(Icons.send_outlined, color: Color(0xFF25D366)),
-            tooltip: 'Envoyer via WhatsApp',
-            onPressed: () => _openWhatsApp(context),
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Modifier',
+            onPressed: () =>
+                context.push('/invoices/${invoice.id}/edit', extra: invoice),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (v) {
-              if (v == 'edit') {
-                context.push('/invoices/${invoice.id}/edit', extra: invoice);
-              } else if (v == 'pdf') {
-                _exportPdf(context);
-              } else if (v == 'delete') {
-                _confirmDelete(context);
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'edit', child: ListTile(
-                leading: Icon(Icons.edit_outlined),
-                title: Text('Modifier'),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-              )),
-              const PopupMenuItem(value: 'pdf', child: ListTile(
-                leading: Icon(Icons.picture_as_pdf_outlined),
-                title: Text('Exporter en PDF'),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-              )),
-              const PopupMenuItem(value: 'delete', child: ListTile(
-                leading: Icon(Icons.delete_outline, color: Colors.red),
-                title: Text('Supprimer', style: TextStyle(color: Colors.red)),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-              )),
-            ],
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Supprimer',
+            onPressed: _confirmDelete,
           ),
         ],
       ),
       floatingActionButton: invoice.isFullyPaid
           ? null
           : FloatingActionButton.extended(
-              onPressed: () => _showAddPaymentSheet(context, invoice),
+              backgroundColor: const Color(0xFF00BFA5),
+              foregroundColor: Colors.white,
               icon: const Icon(Icons.add),
-              label: const Text('Paiement'),
+              label: const Text('Paiement', style: TextStyle(fontWeight: FontWeight.w600)),
+              onPressed: () => _showAddPaymentSheet(context, invoice),
             ),
       body: ListView(
-        padding: const EdgeInsets.all(AppSizes.paddingLarge),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSizes.paddingLarge),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          invoice.title,
-                          style: const TextStyle(
-                            fontSize: AppSizes.fontXL,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          statusLabel(invoice.status),
-                          style: TextStyle(
-                            color: color,
-                            fontWeight: FontWeight.w600,
-                            fontSize: AppSizes.fontSmall,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSizes.paddingSmall),
-                  _InfoRow(icon: Icons.person_outlined, text: invoice.clientName),
-                  const SizedBox(height: 4),
-                  _InfoRow(
-                    icon: Icons.calendar_today_outlined,
-                    text: 'Échéance : ${DateFormatter.format(invoice.dueDate)}',
-                  ),
-                ],
+          // ── Hero card ──────────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1565C0), Color(0xFF00BFA5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-            ),
-          ),
-          const SizedBox(height: AppSizes.paddingMedium),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSizes.paddingLarge),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Montants',
-                    style: TextStyle(fontSize: AppSizes.fontLarge, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: AppSizes.paddingMedium),
-                  _AmountRow(label: 'Total', amount: invoice.totalAmount, bold: true),
-                  const Divider(height: 24),
-                  _AmountRow(label: 'Payé', amount: invoice.paidAmount, color: AppColors.statusPaid),
-                  const SizedBox(height: AppSizes.paddingSmall),
-                  _AmountRow(
-                    label: 'Restant',
-                    amount: invoice.remainingAmount,
-                    color: invoice.remainingAmount > 0 ? AppColors.statusLate : AppColors.statusPaid,
-                  ),
-                  const SizedBox(height: AppSizes.paddingMedium),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: ratio,
-                      minHeight: 10,
-                      backgroundColor: Colors.grey[200],
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${(ratio * 100).toStringAsFixed(0)} % payé',
-                    style: const TextStyle(
-                      fontSize: AppSizes.fontSmall,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSizes.paddingMedium),
-          _SendToClientCard(invoice: invoice, onExportPdf: () => _exportPdf(context)),
-          const SizedBox(height: AppSizes.paddingMedium),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Paiements',
-                style: TextStyle(fontSize: AppSizes.fontLarge, fontWeight: FontWeight.bold),
-              ),
-              if (!invoice.isFullyPaid)
-                TextButton.icon(
-                  onPressed: () => _showAddPaymentSheet(context, invoice),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Ajouter'),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1565C0).withOpacity(0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
-            ],
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        invoice.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        statusLabel(invoice.status),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.person_outline,
+                        color: Colors.white70, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      invoice.clientName,
+                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined,
+                        color: Colors.white70, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Échéance : ${DateFormatter.format(invoice.dueDate)}',
+                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  CurrencyFormatter.format(invoice.totalAmount),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: AppSizes.paddingSmall),
-          _PaymentList(invoiceId: invoice.id),
-          const SizedBox(height: 80),
+
+          const SizedBox(height: 16),
+
+          // ── Résumé financier ───────────────────────────────────────────────
+          _WhiteCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Résumé financier',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                _FinancialRow(
+                  label: 'Total facturé',
+                  amount: invoice.totalAmount,
+                  color: const Color(0xFF1A73E8),
+                ),
+                const Divider(height: 20),
+                _FinancialRow(
+                  label: 'Montant payé',
+                  amount: invoice.paidAmount,
+                  color: const Color(0xFF43A047),
+                ),
+                const SizedBox(height: 8),
+                _FinancialRow(
+                  label: 'Restant dû',
+                  amount: invoice.remainingAmount,
+                  color: invoice.remainingAmount > 0
+                      ? const Color(0xFFF57C00)
+                      : const Color(0xFF43A047),
+                  bold: true,
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: ratio,
+                    minHeight: 10,
+                    backgroundColor: Colors.grey[200],
+                    valueColor: AlwaysStoppedAnimation(
+                      ratio >= 1.0
+                          ? const Color(0xFF43A047)
+                          : const Color(0xFF1A73E8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${(ratio * 100).toStringAsFixed(0)}% payé',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // ── Actions client ─────────────────────────────────────────────────
+          _WhiteCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Envoyer au client',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ActionButton(
+                        icon: Icons.chat_outlined,
+                        label: 'WhatsApp',
+                        color: const Color(0xFF25D366),
+                        onTap: _openWhatsApp,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _exportingPdf
+                          ? Container(
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A73E8).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF1A73E8),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : _ActionButton(
+                              icon: Icons.picture_as_pdf_outlined,
+                              label: 'Exporter PDF',
+                              color: const Color(0xFF1A73E8),
+                              onTap: _exportPdf,
+                            ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => showAddReminderSheet(context, invoice),
+                    icon: const Icon(Icons.notifications_outlined, size: 18),
+                    label: const Text('Programmer un rappel'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF7C4DFF),
+                      side: const BorderSide(color: Color(0xFF7C4DFF)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── Liste des paiements ────────────────────────────────────────────
+          _PaymentListSection(invoiceId: invoice.id),
         ],
       ),
     );
   }
 }
 
-class _SendToClientCard extends StatelessWidget {
-  final InvoiceModel invoice;
-  final VoidCallback onExportPdf;
-
-  const _SendToClientCard({required this.invoice, required this.onExportPdf});
-
-  Future<void> _whatsApp(BuildContext context) async {
-    final clientProvider = context.read<ClientProvider>();
-    final messenger = ScaffoldMessenger.of(context);
-    final client = await clientProvider.getClient(invoice.clientId);
-    final phone = client?.phone ?? '';
-    if (phone.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Numéro de téléphone manquant pour ce client')),
-      );
-      return;
-    }
-    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
-    final message =
-        'Bonjour ${invoice.clientName}, nous vous rappelons qu\'il vous reste '
-        '${CurrencyFormatter.format(invoice.remainingAmount)} FCFA à régler pour '
-        '"${invoice.title}". Merci.';
-    final uri = Uri.parse('https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}');
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Impossible d\'ouvrir WhatsApp')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSizes.paddingMedium),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Envoyer au client',
-              style: TextStyle(fontSize: AppSizes.fontMedium, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _whatsApp(context),
-                    icon: const Icon(Icons.send_outlined, size: 18, color: Color(0xFF25D366)),
-                    label: const Text('WhatsApp'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF25D366),
-                      side: const BorderSide(color: Color(0xFF25D366)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onExportPdf,
-                    icon: const Icon(
-                      Icons.picture_as_pdf_outlined,
-                      size: 18,
-                      color: AppColors.primary,
-                    ),
-                    label: const Text('PDF'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PaymentList extends StatelessWidget {
+// ── Section paiements ──────────────────────────────────────────────────────────
+class _PaymentListSection extends StatelessWidget {
   final String invoiceId;
-  const _PaymentList({required this.invoiceId});
+  const _PaymentListSection({required this.invoiceId});
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<PaymentModel>>(
       stream: context.read<PaymentProvider>().watchPaymentsByInvoice(invoiceId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
         final payments = snapshot.data ?? [];
-        if (payments.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(AppSizes.paddingLarge),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-            ),
-            child: const Row(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Icon(Icons.payments_outlined, color: Colors.grey),
-                SizedBox(width: AppSizes.paddingSmall),
-                Text('Aucun paiement enregistré', style: TextStyle(color: Colors.grey)),
+                const Text(
+                  'Paiements',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 8),
+                if (payments.isNotEmpty)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF43A047).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${payments.length}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF43A047),
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
               ],
             ),
-          );
-        }
-        return Column(
-          children: payments.map((p) => _PaymentTile(payment: p)).toList(),
+            const SizedBox(height: 12),
+            if (payments.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.payments_outlined, color: Colors.grey[400]),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Aucun paiement enregistré',
+                      style: TextStyle(color: Colors.grey[500]),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Column(
+                children: payments
+                    .map((p) => _PaymentTile(payment: p))
+                    .toList(),
+              ),
+          ],
         );
       },
     );
@@ -844,91 +466,101 @@ class _PaymentTile extends StatelessWidget {
   final PaymentModel payment;
   const _PaymentTile({required this.payment});
 
-  Future<void> _confirmDelete(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer ce paiement ?'),
-        content: const Text('Le montant payé sera recalculé automatiquement.'),
-        actions: [
-          TextButton(onPressed: () => ctx.pop(false), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () => ctx.pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Supprimer'),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF43A047).withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check, color: Color(0xFF43A047), size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  DateFormatter.format(payment.paidAt),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                if (payment.note.isNotEmpty)
+                  Text(
+                    payment.note,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            CurrencyFormatter.format(payment.amount),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: Color(0xFF43A047),
+            ),
           ),
         ],
       ),
     );
-    if (confirmed == true && context.mounted) {
-      await context.read<PaymentProvider>().deletePayment(payment.id, payment.invoiceId);
-    }
   }
+}
+
+// ── Widgets réutilisables ──────────────────────────────────────────────────────
+class _WhiteCard extends StatelessWidget {
+  final Widget child;
+  const _WhiteCard({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSizes.paddingSmall),
-      child: ListTile(
-        leading: CircleAvatar(
-          radius: 20,
-          backgroundColor: AppColors.statusPaid.withOpacity(0.12),
-          child: const Icon(Icons.check, color: AppColors.statusPaid, size: 18),
-        ),
-        title: Text(
-          CurrencyFormatter.format(payment.amount),
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: AppSizes.fontMedium),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              DateFormatter.format(payment.paidAt),
-              style: const TextStyle(fontSize: AppSizes.fontSmall),
-            ),
-            if (payment.note.isNotEmpty)
-              Text(
-                payment.note,
-                style: const TextStyle(
-                  fontSize: AppSizes.fontSmall,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-          ],
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-          onPressed: () => _confirmDelete(context),
-        ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
+      child: child,
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  const _InfoRow({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppColors.textSecondary),
-        const SizedBox(width: 6),
-        Expanded(child: Text(text, style: const TextStyle(color: AppColors.textSecondary))),
-      ],
-    );
-  }
-}
-
-class _AmountRow extends StatelessWidget {
+class _FinancialRow extends StatelessWidget {
   final String label;
   final double amount;
-  final Color? color;
+  final Color color;
   final bool bold;
 
-  const _AmountRow({required this.label, required this.amount, this.color, this.bold = false});
+  const _FinancialRow({
+    required this.label,
+    required this.amount,
+    required this.color,
+    this.bold = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -938,20 +570,542 @@ class _AmountRow extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: AppSizes.fontMedium,
-            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-            color: AppColors.textSecondary,
+            color: Colors.grey[700],
+            fontSize: 14,
+            fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
         Text(
           CurrencyFormatter.format(amount),
           style: TextStyle(
-            fontSize: bold ? AppSizes.fontLarge : AppSizes.fontMedium,
             fontWeight: bold ? FontWeight.bold : FontWeight.w600,
-            color: color ?? AppColors.textPrimary,
+            fontSize: bold ? 16 : 14,
+            color: color,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Sheet ajout paiement ───────────────────────────────────────────────────────
+void _showAddPaymentSheet(BuildContext context, InvoiceModel invoice) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) => _AddPaymentSheet(invoice: invoice),
+  );
+}
+
+class _AddPaymentSheet extends StatefulWidget {
+  final InvoiceModel invoice;
+  const _AddPaymentSheet({required this.invoice});
+
+  @override
+  State<_AddPaymentSheet> createState() => _AddPaymentSheetState();
+}
+
+class _AddPaymentSheetState extends State<_AddPaymentSheet> {
+  final _amountCtrl = TextEditingController();
+  final _noteCtrl = TextEditingController();
+  DateTime _date = DateTime.now();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final amount = double.tryParse(_amountCtrl.text.trim().replaceAll(' ', ''));
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Montant invalide')));
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await context.read<PaymentProvider>().addPayment(
+            invoiceId: widget.invoice.id,
+            invoiceTitle: widget.invoice.title,
+            clientId: widget.invoice.clientId,
+            amount: amount,
+            note: _noteCtrl.text.trim(),
+            paidAt: _date,
+          );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00BFA5).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.add, color: Color(0xFF00BFA5)),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Enregistrer un paiement',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Restant : ${CurrencyFormatter.format(widget.invoice.remainingAmount)}',
+            style: const TextStyle(color: Color(0xFFF57C00), fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _amountCtrl,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Montant (FCFA)',
+              prefixIcon: const Icon(Icons.payments_outlined, color: Color(0xFF00BFA5)),
+              filled: true,
+              fillColor: const Color(0xFFF6FBFA),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _noteCtrl,
+            decoration: InputDecoration(
+              labelText: 'Note (optionnel)',
+              prefixIcon: const Icon(Icons.note_outlined, color: Color(0xFF00BFA5)),
+              filled: true,
+              fillColor: const Color(0xFFF6FBFA),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _date,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now().add(const Duration(days: 1)),
+                locale: const Locale('fr', 'FR'),
+              );
+              if (picked != null) setState(() => _date = picked);
+            },
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6FBFA),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_today_outlined, color: Color(0xFF00BFA5), size: 18),
+                  const SizedBox(width: 10),
+                  Text(
+                    DateFormatter.format(_date),
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1A73E8), Color(0xFF00BFA5)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: ElevatedButton(
+                onPressed: _saving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text(
+                        'Enregistrer',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Sheet rappel (exportée pour reminders_screen) ──────────────────────────────
+void showAddReminderSheet(BuildContext context, InvoiceModel invoice) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) => _AddReminderSheet(invoice: invoice),
+  );
+}
+
+class _AddReminderSheet extends StatefulWidget {
+  final InvoiceModel invoice;
+  const _AddReminderSheet({required this.invoice});
+
+  @override
+  State<_AddReminderSheet> createState() => _AddReminderSheetState();
+}
+
+class _AddReminderSheetState extends State<_AddReminderSheet> {
+  ReminderType _type = ReminderType.onDue;
+  DateTime? _customDate;
+  bool _saving = false;
+
+  DateTime get _scheduledAt {
+    switch (_type) {
+      case ReminderType.beforeDue:
+        return widget.invoice.dueDate.subtract(const Duration(days: 3));
+      case ReminderType.onDue:
+        return widget.invoice.dueDate;
+      case ReminderType.afterDue:
+        return widget.invoice.dueDate.add(const Duration(days: 3));
+      case ReminderType.custom:
+        return _customDate ?? widget.invoice.dueDate;
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await context.read<ReminderProvider>().addReminder(
+            invoiceId: widget.invoice.id,
+            clientId: widget.invoice.clientId,
+            clientName: widget.invoice.clientName,
+            invoiceTitle: widget.invoice.title,
+            remainingAmount: widget.invoice.remainingAmount,
+            type: _type,
+            scheduledAt: _scheduledAt,
+          );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Rappel programmé ✓')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C4DFF).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.notifications_outlined,
+                    color: Color(0xFF7C4DFF)),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Programmer un rappel',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            widget.invoice.clientName,
+            style: TextStyle(color: Colors.grey[500], fontSize: 13),
+          ),
+          const SizedBox(height: 20),
+          ..._ReminderOption.values.map((opt) => _ReminderOptionTile(
+                option: opt,
+                selected: _type == opt.type,
+                onTap: () => setState(() => _type = opt.type),
+                dueDate: widget.invoice.dueDate,
+              )),
+          if (_type == ReminderType.custom) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _customDate ?? widget.invoice.dueDate,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  locale: const Locale('fr', 'FR'),
+                );
+                if (picked != null) setState(() => _customDate = picked);
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C4DFF).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: const Color(0xFF7C4DFF).withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined,
+                        color: Color(0xFF7C4DFF), size: 18),
+                    const SizedBox(width: 10),
+                    Text(
+                      _customDate != null
+                          ? DateFormatter.format(_customDate!)
+                          : 'Choisir une date',
+                      style: const TextStyle(
+                          color: Color(0xFF7C4DFF),
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF7C4DFF), Color(0xFF1A73E8)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: ElevatedButton(
+                onPressed: _saving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text(
+                        'Programmer',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _ReminderOption { threeBefore, onDue, threeAfter, custom }
+
+extension _ReminderOptionExt on _ReminderOption {
+  ReminderType get type {
+    switch (this) {
+      case _ReminderOption.threeBefore:
+        return ReminderType.beforeDue;
+      case _ReminderOption.onDue:
+        return ReminderType.onDue;
+      case _ReminderOption.threeAfter:
+        return ReminderType.afterDue;
+      case _ReminderOption.custom:
+        return ReminderType.custom;
+    }
+  }
+
+  String label(DateTime dueDate) {
+    switch (this) {
+      case _ReminderOption.threeBefore:
+        return '3 jours avant l\'échéance (${DateFormatter.format(dueDate.subtract(const Duration(days: 3)))})';
+      case _ReminderOption.onDue:
+        return 'Le jour de l\'échéance (${DateFormatter.format(dueDate)})';
+      case _ReminderOption.threeAfter:
+        return '3 jours après l\'échéance (${DateFormatter.format(dueDate.add(const Duration(days: 3)))})';
+      case _ReminderOption.custom:
+        return 'Date personnalisée';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case _ReminderOption.threeBefore:
+        return Icons.schedule_outlined;
+      case _ReminderOption.onDue:
+        return Icons.today_outlined;
+      case _ReminderOption.threeAfter:
+        return Icons.event_outlined;
+      case _ReminderOption.custom:
+        return Icons.calendar_month_outlined;
+    }
+  }
+}
+
+class _ReminderOptionTile extends StatelessWidget {
+  final _ReminderOption option;
+  final bool selected;
+  final VoidCallback onTap;
+  final DateTime dueDate;
+
+  const _ReminderOptionTile({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+    required this.dueDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Color(0xFF7C4DFF);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? color.withOpacity(0.08) : Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? color : Colors.grey.shade200,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(option.icon, color: selected ? color : Colors.grey, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                option.label(dueDate),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: selected ? color : Colors.grey[700],
+                  fontWeight:
+                      selected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ),
+            if (selected)
+              const Icon(Icons.check_circle, color: color, size: 18),
+          ],
+        ),
+      ),
     );
   }
 }

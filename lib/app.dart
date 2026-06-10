@@ -21,6 +21,8 @@ import 'presentation/reminders/reminders_screen.dart';
 import 'presentation/export/export_screen.dart';
 import 'presentation/settings/settings_screen.dart';
 import 'presentation/settings/business_profile_screen.dart';
+import 'presentation/splash/splash_screen.dart';
+import 'presentation/onboarding/onboarding_screen.dart';
 import 'providers/client_provider.dart';
 import 'providers/invoice_provider.dart';
 import 'providers/payment_provider.dart';
@@ -30,18 +32,23 @@ import 'providers/subscription_provider.dart';
 import 'providers/theme_provider.dart';
 
 final _router = GoRouter(
-  initialLocation: '/login',
+  initialLocation: '/splash',
   redirect: (context, state) {
     final user = FirebaseAuth.instance.currentUser;
     final isLoggedIn = user != null;
-    final isOnAuth = state.matchedLocation == '/login' ||
-        state.matchedLocation == '/register';
+    final loc = state.matchedLocation;
 
+    // Splash et onboarding ne sont jamais redirigés
+    if (loc == '/splash' || loc == '/onboarding') return null;
+
+    final isOnAuth = loc == '/login' || loc == '/register';
     if (!isLoggedIn && !isOnAuth) return '/login';
     if (isLoggedIn && isOnAuth) return '/home';
     return null;
   },
   routes: [
+    GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
+    GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingScreen()),
     GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
     GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
     GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
@@ -126,9 +133,11 @@ class PayRappelApp extends StatelessWidget {
             Locale('en', 'US'),
           ],
           theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppColors.primary,
+            ).copyWith(surface: Colors.white),
             useMaterial3: true,
-            scaffoldBackgroundColor: AppColors.backgroundLight,
+            scaffoldBackgroundColor: const Color(0xFFF0F4F8),
             appBarTheme: const AppBarTheme(
               backgroundColor: AppColors.surface,
               foregroundColor: AppColors.textPrimary,
@@ -148,8 +157,9 @@ class PayRappelApp extends StatelessWidget {
             colorScheme: ColorScheme.fromSeed(
               seedColor: AppColors.primary,
               brightness: Brightness.dark,
-            ),
+            ).copyWith(surface: const Color(0xFF1E2433)),
             useMaterial3: true,
+            scaffoldBackgroundColor: const Color(0xFF111827),
             appBarTheme: const AppBarTheme(elevation: 0),
             inputDecorationTheme: InputDecorationTheme(
               border: OutlineInputBorder(

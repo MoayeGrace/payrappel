@@ -41,11 +41,31 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
     super.dispose();
   }
 
+  InputDecoration _inputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: const Color(0xFF00C6A2)),
+      filled: true,
+      fillColor: const Color(0xFFF6FBFA),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE6F2F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF1E88E5), width: 1.5),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
+
     try {
       final provider = context.read<ClientProvider>();
+
       if (_isEditing) {
         final updated = widget.client!.copyWith(
           name: _nameCtrl.text.trim(),
@@ -62,6 +82,7 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
           note: _noteCtrl.text.trim(),
         );
       }
+
       if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
@@ -80,66 +101,126 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF2F7F9),
+
       appBar: AppBar(
-        title: Text(_isEditing ? 'Modifier le client' : 'Nouveau client'),
+        elevation: 0,
+        backgroundColor: const Color(0xFF1E88E5),
+        foregroundColor: Colors.white,
+        title: Text(
+          _isEditing ? 'Modifier le client' : 'Nouveau client',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
       ),
+
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(AppSizes.paddingLarge),
           children: [
+
+            // Header card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E88E5), Color(0xFF00C6A2)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                _isEditing
+                    ? "Mise à jour des informations client"
+                    : "Ajoute un nouveau client à PayRappel",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: AppSizes.paddingLarge),
+
+            // Name
             TextFormField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Nom complet *',
-                prefixIcon: Icon(Icons.person),
-              ),
+              decoration: _inputDecoration('Nom complet *', Icons.person),
               textCapitalization: TextCapitalization.words,
               validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Le nom est obligatoire' : null,
+                  (v == null || v.trim().isEmpty)
+                      ? 'Le nom est obligatoire'
+                      : null,
             ),
+
             const SizedBox(height: AppSizes.paddingMedium),
+
+            // Phone
             TextFormField(
               controller: _phoneCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Téléphone *',
-                prefixIcon: Icon(Icons.phone),
-              ),
+              decoration: _inputDecoration('Téléphone *', Icons.phone),
               keyboardType: TextInputType.phone,
               validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Le téléphone est obligatoire' : null,
+                  (v == null || v.trim().isEmpty)
+                      ? 'Le téléphone est obligatoire'
+                      : null,
             ),
+
             const SizedBox(height: AppSizes.paddingMedium),
+
+            // Email
             TextFormField(
               controller: _emailCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Email (optionnel)',
-                prefixIcon: Icon(Icons.email),
-              ),
+              decoration: _inputDecoration('Email (optionnel)', Icons.email),
               keyboardType: TextInputType.emailAddress,
             ),
+
             const SizedBox(height: AppSizes.paddingMedium),
+
+            // Note
             TextFormField(
               controller: _noteCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Note (optionnel)',
-                prefixIcon: Icon(Icons.note),
-              ),
+              decoration: _inputDecoration('Note (optionnel)', Icons.note),
               maxLines: 3,
             ),
+
             const SizedBox(height: AppSizes.paddingXL),
-            ElevatedButton(
-              onPressed: _submitting ? null : _submit,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
+
+            // Submit button (premium gradient)
+            Container(
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E88E5), Color(0xFF00C6A2)],
+                ),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: _submitting
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(_isEditing ? 'Enregistrer' : 'Ajouter le client'),
+              child: ElevatedButton(
+                onPressed: _submitting ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: _submitting
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        _isEditing ? 'Enregistrer' : 'Ajouter le client',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+              ),
             ),
           ],
         ),
