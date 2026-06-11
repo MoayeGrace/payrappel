@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/client_model.dart';
@@ -30,6 +31,58 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
     _phoneCtrl = TextEditingController(text: widget.client?.phone ?? '');
     _emailCtrl = TextEditingController(text: widget.client?.email ?? '');
     _noteCtrl = TextEditingController(text: widget.client?.note ?? '');
+  }
+
+  Future<void> _importContact() async {
+    try {
+      final granted = await FlutterContacts.requestPermission(readonly: true);
+      if (!granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Accès aux contacts refusé. Allez dans Paramètres '
+                '→ Applications → PayRappel → Autorisations '
+                '→ Contacts pour l\'activer.',
+              ),
+              duration: Duration(seconds: 6),
+            ),
+          );
+        }
+        return;
+      }
+
+      final contact = await FlutterContacts.openExternalPick();
+      if (contact == null || !mounted) return;
+
+      final full = await FlutterContacts.getContact(
+        contact.id,
+        withProperties: true,
+      );
+
+      // Fallback sur le nom du sélecteur si getContact échoue
+      final name = full?.displayName ?? contact.displayName;
+      if (name.isNotEmpty) _nameCtrl.text = name;
+
+      if (full != null) {
+        if (full.phones.isNotEmpty) {
+          final raw = full.phones.first.number
+              .replaceAll(RegExp(r'[\s\-()]'), '');
+          _phoneCtrl.text = raw;
+        }
+        if (full.emails.isNotEmpty && _emailCtrl.text.isEmpty) {
+          _emailCtrl.text = full.emails.first.address;
+        }
+      }
+
+      setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Impossible d\'importer le contact : $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -128,14 +181,51 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
                 ),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Text(
-                _isEditing
-                    ? "Mise à jour des informations client"
-                    : "Ajoute un nouveau client à PayRappel",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isEditing
+                          ? "Mise à jour des informations client"
+                          : "Ajoute un nouveau client à PayRappel",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  if (!_isEditing) ...[
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: _importContact,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: Colors.white.withOpacity(0.4)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.contacts_outlined,
+                                color: Colors.white, size: 16),
+                            SizedBox(width: 6),
+                            Text(
+                              'Importer',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
 

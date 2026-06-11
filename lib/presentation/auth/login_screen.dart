@@ -110,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Color(0xFF34A853),
                       ],
                     ),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
                         color: Color(0x331A73E8),
                         blurRadius: 25,
@@ -252,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   Color(0xFF34A853),
                                 ],
                               ),
-                              boxShadow: [
+                              boxShadow: const [
                                 BoxShadow(
                                   color: Color(0x331A73E8),
                                   blurRadius: 18,
@@ -313,8 +313,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 20),
 
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Expanded(child: Divider()),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 12),

@@ -48,6 +48,13 @@ class AuthRepository {
     return await _auth.currentUser!.linkWithCredential(credential);
   }
 
+  // Envoyer un email de vérification
+  Future<void> sendEmailVerification() async {
+    await _auth.currentUser?.sendEmailVerification();
+  }
+
+  bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
+
   // Déconnexion
   Future<void> logout() async {
     await _auth.signOut();

@@ -48,6 +48,12 @@ dependencies:
   # Excel
   excel: ^4.0.6
 
+  # Graphiques
+  fl_chart: '>=0.69.0 <0.70.0'
+
+  # Contacts téléphone
+  flutter_contacts: ^1.1.9+2
+
   # Sélection d'image (logo entreprise)
   image_picker: ^1.1.2
 

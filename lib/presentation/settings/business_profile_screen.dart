@@ -177,9 +177,9 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                           ),
                           child: hasLogo
                               ? null
-                              : Column(
+                              : const Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
+                                  children: [
                                     Icon(Icons.add_a_photo_outlined,
                                         color: Colors.white, size: 28),
                                     SizedBox(height: 4),
@@ -240,7 +240,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
             const SizedBox(height: 20),
 
             // ── Informations entreprise ──────────────────────────────────────
-            _SectionLabel('Informations entreprise'),
+            const _SectionLabel('Informations entreprise'),
             _FormCard(
               children: [
                 _Field(
@@ -288,7 +288,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
             const SizedBox(height: 20),
 
             // ── Informations bancaires ───────────────────────────────────────
-            _SectionLabel('Coordonnées bancaires (optionnel)'),
+            const _SectionLabel('Coordonnées bancaires (optionnel)'),
             _FormCard(
               children: [
                 _Field(
@@ -309,7 +309,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
             const SizedBox(height: 20),
 
             // ── Pied de page PDF ─────────────────────────────────────────────
-            _SectionLabel('Pied de page de vos factures'),
+            const _SectionLabel('Pied de page de vos factures'),
             _FormCard(
               children: [
                 _Field(

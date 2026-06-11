@@ -4,14 +4,15 @@ class InvoiceModel {
   final String id;
   final String userId;
   final String clientId;
-  final String clientName; // dénormalisé pour l'affichage rapide
+  final String clientName;
   final String title;
   final double totalAmount;
-  final double paidAmount; // mis à jour à chaque paiement
+  final double paidAmount;
   final DateTime dueDate;
   final InvoiceStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<Map<String, String>> customFields;
 
   const InvoiceModel({
     required this.id,
@@ -25,10 +26,10 @@ class InvoiceModel {
     this.status = InvoiceStatus.draft,
     required this.createdAt,
     required this.updatedAt,
+    this.customFields = const [],
   });
 
   double get remainingAmount => totalAmount - paidAmount;
-
   bool get isFullyPaid => paidAmount >= totalAmount;
 
   factory InvoiceModel.fromMap(Map<String, dynamic> map, String id) {
@@ -53,6 +54,10 @@ class InvoiceModel {
       updatedAt: DateTime.fromMillisecondsSinceEpoch(
         map['updatedAt'] as int? ?? 0,
       ),
+      customFields: (map['customFields'] as List?)
+              ?.map((e) => Map<String, String>.from(e as Map))
+              .toList() ??
+          [],
     );
   }
 
@@ -68,6 +73,7 @@ class InvoiceModel {
       'status': status.name,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
+      'customFields': customFields,
     };
   }
 
@@ -78,6 +84,7 @@ class InvoiceModel {
     DateTime? dueDate,
     InvoiceStatus? status,
     DateTime? updatedAt,
+    List<Map<String, String>>? customFields,
   }) {
     return InvoiceModel(
       id: id,
@@ -91,6 +98,7 @@ class InvoiceModel {
       status: status ?? this.status,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      customFields: customFields ?? this.customFields,
     );
   }
 }

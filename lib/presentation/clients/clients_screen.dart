@@ -72,14 +72,14 @@ class _SearchBar extends StatelessWidget {
     ],
   ),
   child: TextField(
-    decoration: InputDecoration(
+    decoration: const InputDecoration(
       hintText: "Rechercher un client",
-      prefixIcon: const Icon(
+      prefixIcon: Icon(
         Icons.search,
         color: AppColors.primary,
       ),
       border: InputBorder.none,
-      contentPadding: const EdgeInsets.symmetric(
+      contentPadding: EdgeInsets.symmetric(
         horizontal: 20,
         vertical: 18,
       ),
@@ -189,9 +189,9 @@ class _ClientTile extends StatelessWidget {
                 Container(
                   width: 58,
                   height: 58,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
+                    gradient: LinearGradient(
                       colors: [
                         Color(0xFF1A73E8),
                         Color(0xFF34A853),

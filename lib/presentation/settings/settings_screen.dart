@@ -83,7 +83,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 16),
 
           // ── Mon entreprise ───────────────────────────────────────────────
-          _SectionHeader('Mon entreprise'),
+          const _SectionHeader('Mon entreprise'),
           _SettingsTile(
             icon: Icons.business_outlined,
             iconColor: const Color(0xFF1A73E8),
@@ -95,7 +95,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
 
           // ── Apparence ────────────────────────────────────────────────────
-          _SectionHeader('Apparence'),
+          const _SectionHeader('Apparence'),
           _SettingsCard(
             child: SwitchListTile(
               secondary: Container(
@@ -135,7 +135,7 @@ class SettingsScreen extends StatelessWidget {
 
           // ── Compte ───────────────────────────────────────────────────────
           if (!isGuest) ...[
-            _SectionHeader('Compte'),
+            const _SectionHeader('Compte'),
             _SettingsTile(
               icon: Icons.lock_reset_outlined,
               iconColor: const Color(0xFF00BFA5),
@@ -147,7 +147,7 @@ class SettingsScreen extends StatelessWidget {
 
           // ── Mode invité ──────────────────────────────────────────────────
           if (isGuest) ...[
-            _SectionHeader('Mode invité'),
+            const _SectionHeader('Mode invité'),
             _SettingsTile(
               icon: Icons.person_add_outlined,
               iconColor: const Color(0xFF00BFA5),
@@ -160,7 +160,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
 
           // ── Session ──────────────────────────────────────────────────────
-          _SectionHeader('Session'),
+          const _SectionHeader('Session'),
           _SettingsTile(
             icon: Icons.logout,
             iconColor: Colors.orange,
@@ -173,7 +173,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
 
           // ── Zone de danger ───────────────────────────────────────────────
-          _SectionHeader('Zone de danger'),
+          const _SectionHeader('Zone de danger'),
           _SettingsTile(
             icon: Icons.delete_forever_outlined,
             iconColor: Colors.red,

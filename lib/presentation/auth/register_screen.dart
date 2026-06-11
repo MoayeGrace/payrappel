@@ -32,8 +32,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
-      // Si l'utilisateur est en mode invité, on lie son compte à l'email
-      // pour conserver ses données. Sinon, on crée un compte normal.
       if (_authRepo.isAnonymous) {
         await _authRepo.linkGuestToEmail(
           email: _emailController.text,
@@ -45,7 +43,56 @@ class _RegisterScreenState extends State<RegisterScreen> {
           password: _passwordController.text,
         );
       }
-      if (mounted) context.go('/home');
+      // Envoyer la vérification email (sauf pour les comptes liés invité)
+      try {
+        await _authRepo.sendEmailVerification();
+      } catch (_) {}
+
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A73E8).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.mark_email_read_outlined,
+                      color: Color(0xFF1A73E8)),
+                ),
+                const SizedBox(width: 12),
+                const Text('Email envoyé',
+                    style: TextStyle(fontSize: 18)),
+              ],
+            ),
+            content: Text(
+              'Un lien de vérification a été envoyé à\n${_emailController.text.trim()}\n\nVérifiez votre boîte mail et cliquez sur le lien.',
+              style: const TextStyle(height: 1.5),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  ctx.pop();
+                  context.go('/home');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A73E8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Continuer',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      }
     } on Exception catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

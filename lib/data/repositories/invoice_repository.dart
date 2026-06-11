@@ -66,6 +66,7 @@ class InvoiceRepository {
     required String title,
     required double totalAmount,
     required DateTime dueDate,
+    List<Map<String, String>> customFields = const [],
   }) async {
     final id = _uuid.v4();
     final now = DateTime.now();
@@ -85,6 +86,7 @@ class InvoiceRepository {
       ),
       createdAt: now,
       updatedAt: now,
+      customFields: customFields,
     );
     await _collection.doc(id).set(invoice.toMap()).timeout(_kWriteTimeout, onTimeout: () {});
     return invoice;

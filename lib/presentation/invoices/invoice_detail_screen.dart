@@ -312,6 +312,58 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
 
           const SizedBox(height: 12),
 
+          // ── Champs personnalisés ───────────────────────────────────────────
+          if (invoice.customFields.isNotEmpty) ...[
+            _WhiteCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.tune_outlined,
+                          size: 16, color: Color(0xFF1E88E5)),
+                      SizedBox(width: 8),
+                      Text(
+                        'Informations complémentaires',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ...invoice.customFields.map((f) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                f['label'] ?? '',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600]),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: Text(
+                                f['value'] ?? '',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600),
+                                textAlign: TextAlign.end,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // ── Actions client ─────────────────────────────────────────────────
           _WhiteCard(
             child: Column(

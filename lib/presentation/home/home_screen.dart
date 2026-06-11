@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -151,13 +152,38 @@ class _HomeAppBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1565C0), Color(0xFF00BFA5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1A73E8).withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.account_balance_wallet_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 10),
           RichText(
             text: const TextSpan(
               children: [
                 TextSpan(
                   text: 'Pay',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1A73E8),
                   ),
@@ -165,8 +191,8 @@ class _HomeAppBar extends StatelessWidget {
                 TextSpan(
                   text: 'Rappel',
                   style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w300,
                     color: Color(0xFF00BFA5),
                   ),
                 ),
@@ -316,8 +342,15 @@ class _GuestBanner extends StatelessWidget {
 }
 
 // ── Stats Section ──────────────────────────────────────────────────────────────
-class _StatsSection extends StatelessWidget {
+class _StatsSection extends StatefulWidget {
   const _StatsSection();
+
+  @override
+  State<_StatsSection> createState() => _StatsSectionState();
+}
+
+class _StatsSectionState extends State<_StatsSection> {
+  bool _showChart = false;
 
   @override
   Widget build(BuildContext context) {
@@ -334,11 +367,9 @@ class _StatsSection extends StatelessWidget {
             final totalToCollect = invoices
                 .where((i) => !i.isFullyPaid)
                 .fold(0.0, (sum, i) => sum + i.remainingAmount);
-
             final lateAmount = invoices
                 .where((i) => i.status == InvoiceStatus.late)
                 .fold(0.0, (sum, i) => sum + i.remainingAmount);
-
             final monthPayments = payments
                 .where((p) =>
                     p.paidAt.year == now.year &&
@@ -348,52 +379,503 @@ class _StatsSection extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Vue d'ensemble",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(
-                      child: _StatCard(
-                        label: 'À encaisser',
-                        value: CurrencyFormatter.format(totalToCollect),
-                        subtitle: 'Total dû par les clients',
-                        icon: Icons.account_balance_wallet_outlined,
-                        color: const Color(0xFF1A73E8),
-                      ),
+                    const Text(
+                      "Vue d'ensemble",
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _StatCard(
-                        label: 'En retard',
-                        value: CurrencyFormatter.format(lateAmount),
-                        subtitle: 'Créances échues',
-                        icon: Icons.access_time_outlined,
-                        color: const Color(0xFFE53935),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _StatCard(
-                        label: 'Paiements reçus',
-                        value: CurrencyFormatter.format(monthPayments),
-                        subtitle: 'Ce mois-ci',
-                        icon: Icons.check_circle_outline,
-                        color: const Color(0xFF43A047),
-                      ),
+                    const Spacer(),
+                    _ViewToggle(
+                      showChart: _showChart,
+                      onToggle: (v) => setState(() => _showChart = v),
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                if (_showChart)
+                  _PaymentsChart(payments: payments)
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          label: 'À encaisser',
+                          value: CurrencyFormatter.format(totalToCollect),
+                          subtitle: 'Total dû par les clients',
+                          icon: Icons.account_balance_wallet_outlined,
+                          color: const Color(0xFF1A73E8),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatCard(
+                          label: 'En retard',
+                          value: CurrencyFormatter.format(lateAmount),
+                          subtitle: 'Créances échues',
+                          icon: Icons.access_time_outlined,
+                          color: const Color(0xFFE53935),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatCard(
+                          label: 'Paiements reçus',
+                          value: CurrencyFormatter.format(monthPayments),
+                          subtitle: 'Ce mois-ci',
+                          icon: Icons.check_circle_outline,
+                          color: const Color(0xFF43A047),
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             );
           },
         );
       },
+    );
+  }
+}
+
+// ── Toggle vue ─────────────────────────────────────────────────────────────────
+class _ViewToggle extends StatelessWidget {
+  final bool showChart;
+  final ValueChanged<bool> onToggle;
+  const _ViewToggle({required this.showChart, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 32,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ToggleBtn(
+            icon: Icons.grid_view_rounded,
+            active: !showChart,
+            onTap: () => onToggle(false),
+          ),
+          _ToggleBtn(
+            icon: Icons.bar_chart_rounded,
+            active: showChart,
+            onTap: () => onToggle(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToggleBtn extends StatelessWidget {
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+  const _ToggleBtn(
+      {required this.icon, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 40,
+        height: 32,
+        decoration: BoxDecoration(
+          gradient: active
+              ? const LinearGradient(
+                  colors: [Color(0xFF1A73E8), Color(0xFF00BFA5)])
+              : null,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: active ? Colors.white : Colors.grey,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Graphique paiements ────────────────────────────────────────────────────────
+enum _ChartPeriod { m3, m6, m12, year, custom }
+
+extension _ChartPeriodExt on _ChartPeriod {
+  String get label {
+    switch (this) {
+      case _ChartPeriod.m3:     return '3 M';
+      case _ChartPeriod.m6:     return '6 M';
+      case _ChartPeriod.m12:    return '12 M';
+      case _ChartPeriod.year:   return 'Année';
+      case _ChartPeriod.custom: return 'Perso.';
+    }
+  }
+}
+
+class _PaymentsChart extends StatefulWidget {
+  final List<PaymentModel> payments;
+  const _PaymentsChart({required this.payments});
+
+  @override
+  State<_PaymentsChart> createState() => _PaymentsChartState();
+}
+
+class _PaymentsChartState extends State<_PaymentsChart> {
+  int? _touchedIndex;
+  _ChartPeriod _period = _ChartPeriod.m6;
+  DateTimeRange? _customRange;
+
+  static const _monthLabels = [
+    'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+    'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc',
+  ];
+
+  String _fmtShort(DateTime d) =>
+      '${d.day} ${_monthLabels[d.month - 1].toLowerCase()}.';
+
+  String get _chartTitle {
+    final now = DateTime.now();
+    switch (_period) {
+      case _ChartPeriod.m3:   return '3 derniers mois';
+      case _ChartPeriod.m6:   return '6 derniers mois';
+      case _ChartPeriod.m12:  return '12 derniers mois';
+      case _ChartPeriod.year: return 'Année ${now.year}';
+      case _ChartPeriod.custom:
+        if (_customRange == null) return 'Période personnalisée';
+        return '${_fmtShort(_customRange!.start)} → ${_fmtShort(_customRange!.end)}';
+    }
+  }
+
+  List<({String label, double amount, DateTime month})> _buildMonthData() {
+    final now = DateTime.now();
+    List<DateTime> months;
+
+    switch (_period) {
+      case _ChartPeriod.year:
+        months = List.generate(now.month, (i) => DateTime(now.year, i + 1));
+      case _ChartPeriod.custom:
+        if (_customRange == null) return [];
+        final start = DateTime(_customRange!.start.year, _customRange!.start.month);
+        final end   = DateTime(_customRange!.end.year,   _customRange!.end.month);
+        months = [];
+        var cur = start;
+        while (!cur.isAfter(end)) {
+          months.add(cur);
+          cur = DateTime(cur.year, cur.month + 1);
+        }
+      default:
+        final count = _period == _ChartPeriod.m3 ? 3 : _period == _ChartPeriod.m12 ? 12 : 6;
+        months = List.generate(count,
+            (i) => DateTime(now.year, now.month - (count - 1) + i));
+    }
+
+    return months.map((m) {
+      final amount = widget.payments
+          .where((p) => p.paidAt.year == m.year && p.paidAt.month == m.month)
+          .fold(0.0, (s, p) => s + p.amount);
+      return (label: _monthLabels[m.month - 1], amount: amount, month: m);
+    }).toList();
+  }
+
+  Future<void> _onPeriodTap(_ChartPeriod p) async {
+    if (p == _ChartPeriod.custom) {
+      final range = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(2020),
+        lastDate: DateTime.now(),
+        initialDateRange: _customRange,
+        locale: const Locale('fr', 'FR'),
+        helpText: 'Sélectionner une période',
+        saveText: 'Valider',
+        builder: (ctx, child) => Theme(
+          data: Theme.of(ctx).copyWith(
+            colorScheme: Theme.of(ctx).colorScheme.copyWith(
+              primary: const Color(0xFF1A73E8),
+            ),
+          ),
+          child: child!,
+        ),
+      );
+      if (range != null && mounted) {
+        setState(() {
+          _customRange = range;
+          _period = _ChartPeriod.custom;
+          _touchedIndex = null;
+        });
+      }
+      return;
+    }
+    setState(() {
+      _period = p;
+      _touchedIndex = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = _buildMonthData();
+    final maxVal = data.isEmpty
+        ? 0.0
+        : data.map((d) => d.amount).reduce((a, b) => a > b ? a : b);
+    final effectiveMax = maxVal < 1 ? 100.0 : maxVal * 1.25;
+    final barWidth = data.length <= 3 ? 28.0
+        : data.length <= 6  ? 22.0
+        : data.length <= 12 ? 14.0
+        : 10.0;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // En-tête : titre + sélecteur de période
+          Row(
+            children: [
+              const Icon(Icons.bar_chart_rounded,
+                  size: 16, color: Color(0xFF1A73E8)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Paiements reçus — $_chartTitle',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A73E8)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Sélecteur période
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F4FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _ChartPeriod.values.map((p) {
+                    final active = p == _period;
+                    return GestureDetector(
+                      onTap: () => _onPeriodTap(p),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: active
+                              ? const Color(0xFF1A73E8)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: p == _ChartPeriod.custom
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.date_range_outlined,
+                                      size: 12,
+                                      color: active
+                                          ? Colors.white
+                                          : Colors.grey[500]),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    p.label,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: active
+                                          ? Colors.white
+                                          : Colors.grey[500],
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                p.label,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: active
+                                      ? Colors.white
+                                      : Colors.grey[500],
+                                ),
+                              ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+
+          // Indicateur de plage personnalisée sélectionnée
+          if (_period == _ChartPeriod.custom && _customRange != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const SizedBox(width: 22),
+                Icon(Icons.calendar_today_outlined,
+                    size: 11, color: Colors.grey[400]),
+                const SizedBox(width: 4),
+                Text(
+                  '${_fmtShort(_customRange!.start)} au ${_fmtShort(_customRange!.end)}',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => _onPeriodTap(_ChartPeriod.custom),
+                  child: const Icon(Icons.edit_outlined,
+                      size: 12, color: Color(0xFF1A73E8)),
+                ),
+              ],
+            ),
+          ],
+
+          if (_period == _ChartPeriod.custom && _customRange == null) ...[
+            const SizedBox(height: 10),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => _onPeriodTap(_ChartPeriod.custom),
+                icon: const Icon(Icons.date_range_outlined, size: 16),
+                label: const Text('Choisir les dates'),
+                style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF1A73E8)),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 160,
+              child: BarChart(
+                BarChartData(
+                  maxY: effectiveMax,
+                  barTouchData: BarTouchData(
+                    touchCallback: (event, response) {
+                      if (event.isInterestedForInteractions &&
+                          response?.spot != null) {
+                        setState(() => _touchedIndex =
+                            response!.spot!.touchedBarGroupIndex);
+                      } else {
+                        setState(() => _touchedIndex = null);
+                      }
+                    },
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => const Color(0xFF1565C0),
+                      tooltipRoundedRadius: 8,
+                      getTooltipItem: (group, gi, rod, ri) => BarTooltipItem(
+                        CurrencyFormatter.format(rod.toY),
+                        const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    leftTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          final idx = value.toInt();
+                          if (idx < 0 || idx >= data.length) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              data[idx].label,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[600],
+                                fontWeight: idx == _touchedIndex
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                      color: Colors.grey.shade200,
+                      strokeWidth: 0.8,
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barGroups: List.generate(data.length, (i) {
+                    final isSelected = i == _touchedIndex;
+                    return BarChartGroupData(
+                      x: i,
+                      barRods: [
+                        BarChartRodData(
+                          toY: data[i].amount,
+                          width: barWidth,
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(6)),
+                          gradient: LinearGradient(
+                            colors: isSelected
+                                ? [
+                                    const Color(0xFF00BFA5),
+                                    const Color(0xFF00E5CC),
+                                  ]
+                                : [
+                                    const Color(0xFF1A73E8),
+                                    const Color(0xFF42A5F5),
+                                  ],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_touchedIndex != null)
+              Center(
+                child: Text(
+                  '${data[_touchedIndex!].label} : ${CurrencyFormatter.format(data[_touchedIndex!].amount)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A73E8),
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -404,16 +886,13 @@ class _StatCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final Color color;
-  final double valueFontSize; // 👈 AJOUT
 
   const _StatCard({
-    super.key,
     required this.label,
     required this.value,
     required this.subtitle,
     required this.icon,
     required this.color,
-    this.valueFontSize = 40, // 👈 default
   });
 
   @override

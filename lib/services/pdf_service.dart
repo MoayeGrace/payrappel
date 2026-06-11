@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 import '../core/utils/currency_formatter.dart';
 import '../data/models/business_profile_model.dart';
 import '../data/models/invoice_model.dart';
@@ -49,6 +50,10 @@ class PdfService {
             pw.Divider(color: _divider, thickness: 0.5),
             pw.SizedBox(height: 20),
             _buildParties(profile, invoice, clientPhone, clientEmail, clientAddress),
+            if (invoice.customFields.isNotEmpty) ...[
+              pw.SizedBox(height: 20),
+              _buildCustomFieldsBlock(invoice.customFields),
+            ],
             pw.SizedBox(height: 24),
             _buildAmountsBlock(invoice),
             if (payments.isNotEmpty) ...[
@@ -104,9 +109,12 @@ class PdfService {
     return pdf.save();
   }
 
-  // ── Partager ─────────────────────────────────────────────────────────────
+  // ── Partager / Enregistrer ────────────────────────────────────────────────
   static Future<void> sharePdf(Uint8List bytes, {required String filename}) async {
-    await Printing.sharePdf(bytes: bytes, filename: filename);
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/$filename');
+    await file.writeAsBytes(bytes);
+    await Share.shareXFiles([XFile(file.path)], text: 'Document PDF');
   }
 
   // ── Header facture ───────────────────────────────────────────────────────
@@ -154,22 +162,22 @@ class PdfService {
                     if (profile.ownerName.isNotEmpty)
                       pw.Text(
                         profile.ownerName,
-                        style: pw.TextStyle(fontSize: 10, color: _textGrey),
+                        style: const pw.TextStyle(fontSize: 10, color: _textGrey),
                       ),
                     if (profile.address.isNotEmpty)
                       pw.Text(
                         profile.address,
-                        style: pw.TextStyle(fontSize: 9, color: _textGrey),
+                        style: const pw.TextStyle(fontSize: 9, color: _textGrey),
                       ),
                     if (profile.phone.isNotEmpty)
                       pw.Text(
                         profile.phone,
-                        style: pw.TextStyle(fontSize: 9, color: _textGrey),
+                        style: const pw.TextStyle(fontSize: 9, color: _textGrey),
                       ),
                     if (profile.rccm.isNotEmpty)
                       pw.Text(
                         'RCCM/NIF : ${profile.rccm}',
-                        style: pw.TextStyle(fontSize: 9, color: _textGrey),
+                        style: const pw.TextStyle(fontSize: 9, color: _textGrey),
                       ),
                   ],
                 ),
@@ -217,7 +225,7 @@ class PdfService {
             pw.SizedBox(height: 6),
             pw.Text(
               'Émise le ${_fmtDate(invoice.createdAt)}',
-              style: pw.TextStyle(fontSize: 9, color: _textGrey),
+              style: const pw.TextStyle(fontSize: 9, color: _textGrey),
             ),
             pw.Text(
               'Échéance : ${_fmtDate(invoice.dueDate)}',
@@ -265,7 +273,7 @@ class PdfService {
               ),
               if (profile.phone.isNotEmpty)
                 pw.Text(profile.phone,
-                    style: pw.TextStyle(fontSize: 9, color: _textGrey)),
+                    style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
             ],
           ),
         ),
@@ -322,7 +330,7 @@ class PdfService {
               if (clientPhone != null && clientPhone.isNotEmpty) clientPhone,
               if (clientEmail != null && clientEmail.isNotEmpty) clientEmail,
             ],
-            color: PdfColor.fromInt(0xFFF8F9FA),
+            color: const PdfColor.fromInt(0xFFF8F9FA),
           ),
         ),
         pw.SizedBox(width: 16),
@@ -369,7 +377,7 @@ class PdfService {
           ...lines.map((l) => pw.Padding(
                 padding: const pw.EdgeInsets.only(top: 2),
                 child: pw.Text(l,
-                    style: pw.TextStyle(fontSize: 9, color: _textGrey)),
+                    style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
               )),
         ],
       ),
@@ -380,7 +388,7 @@ class PdfService {
     return pw.Container(
       padding: const pw.EdgeInsets.all(12),
       decoration: pw.BoxDecoration(
-        color: PdfColor.fromInt(0xFFF8F9FA),
+        color: const PdfColor.fromInt(0xFFF8F9FA),
         borderRadius: pw.BorderRadius.circular(6),
       ),
       child: pw.Column(
@@ -464,7 +472,7 @@ class PdfService {
       children: [
         pw.Text(
           label,
-          style: pw.TextStyle(fontSize: 9, color: _textGrey),
+          style: const pw.TextStyle(fontSize: 9, color: _textGrey),
           textAlign: pw.TextAlign.center,
         ),
         pw.SizedBox(height: 4),
@@ -546,7 +554,7 @@ class PdfService {
         pw.Container(
           padding: const pw.EdgeInsets.all(16),
           decoration: pw.BoxDecoration(
-            color: PdfColor.fromInt(0xFFF0FFF4),
+            color: const PdfColor.fromInt(0xFFF0FFF4),
             borderRadius: pw.BorderRadius.circular(8),
             border: pw.Border.all(color: _green, width: 0.5),
           ),
@@ -618,7 +626,7 @@ class PdfService {
               children: [
                 pw.Text(
                   'Coordonnées bancaires : ',
-                  style: pw.TextStyle(fontSize: 9, color: _textGrey),
+                  style: const pw.TextStyle(fontSize: 9, color: _textGrey),
                 ),
                 if (profile.bankName.isNotEmpty)
                   pw.Text(
@@ -642,13 +650,13 @@ class PdfService {
             padding: const pw.EdgeInsets.only(bottom: 4),
             child: pw.Text(
               profile.footerText,
-              style: pw.TextStyle(fontSize: 9, color: _textGrey),
+              style: const pw.TextStyle(fontSize: 9, color: _textGrey),
               textAlign: pw.TextAlign.center,
             ),
           ),
         pw.Text(
           'Document généré par PayRappel',
-          style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFFBDC1C6)),
+          style: const pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFFBDC1C6)),
           textAlign: pw.TextAlign.center,
         ),
       ],
@@ -676,7 +684,7 @@ class PdfService {
       child: pw.Row(
         children: [
           pw.Text('$label : ',
-              style: pw.TextStyle(fontSize: 9, color: _textGrey)),
+              style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
           pw.Text(value,
               style: pw.TextStyle(
                   fontSize: 9, fontWeight: pw.FontWeight.bold)),
@@ -697,7 +705,7 @@ class PdfService {
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
           pw.Text(label,
-              style: pw.TextStyle(fontSize: 10, color: _textGrey)),
+              style: const pw.TextStyle(fontSize: 10, color: _textGrey)),
           pw.Text(
             value,
             style: pw.TextStyle(
@@ -727,4 +735,57 @@ class PdfService {
         InvoiceStatus.late => _red,
         InvoiceStatus.draft => _primary,
       };
+
+  static pw.Widget _buildCustomFieldsBlock(
+      List<Map<String, String>> fields) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Informations complémentaires',
+          style: pw.TextStyle(
+            fontSize: 10,
+            fontWeight: pw.FontWeight.bold,
+            color: _textGrey,
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(10),
+          decoration: const pw.BoxDecoration(
+            color: _primaryLight,
+            borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
+          ),
+          child: pw.Column(
+            children: fields
+                .map(
+                  (f) => pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 3),
+                    child: pw.Row(
+                      mainAxisAlignment:
+                          pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(
+                          f['label'] ?? '',
+                          style: const pw.TextStyle(
+                              fontSize: 9, color: _textGrey),
+                        ),
+                        pw.Text(
+                          f['value'] ?? '',
+                          style: pw.TextStyle(
+                            fontSize: 9,
+                            fontWeight: pw.FontWeight.bold,
+                            color: _textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ],
+    );
+  }
 }

@@ -190,7 +190,7 @@ class _ClientInvoiceList extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
-          return _EmptyState(
+          return const _EmptyState(
             icon: Icons.error_outline,
             text: "Erreur de chargement des factures",
             color: Colors.red,
