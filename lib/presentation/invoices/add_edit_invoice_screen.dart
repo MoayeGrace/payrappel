@@ -39,7 +39,7 @@ class _ClientDropdown extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(14),
           ),
           child: DropdownButtonFormField<String>(
@@ -76,7 +76,7 @@ class _LockedClientField extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -192,9 +192,6 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
 
     final newLabel = labelCtrl.text.trim();
     final newValue = valueCtrl.text.trim();
-    // Pas de dispose() manuel : le dialogue n'est pas encore démonté à ce
-    // stade, les TextField appelleraient removeListener sur un contrôleur
-    // déjà disposé. Ces variables locales sont GC'd à la fin de la fonction.
 
     if (confirmed == true && mounted && newLabel.isNotEmpty) {
       setState(() {
@@ -208,13 +205,16 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
     }
   }
 
-  // ── Soumission ─────────────────────────────────────────────────────────────
+  // ── Input decoration ───────────────────────────────────────────────────────
   InputDecoration _input(String label, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon, color: const Color(0xFF00C6A2)),
       filled: true,
-      fillColor: const Color(0xFFF6FBFA),
+      fillColor: isDark
+          ? Theme.of(context).colorScheme.surfaceContainerHighest
+          : const Color(0xFFF6FBFA),
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
@@ -289,8 +289,13 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
   // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final containerColor = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : const Color(0xFFF6FBFA);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F7FA),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: const Color(0xFF1E88E5),
@@ -358,7 +363,7 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: surfaceColor,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
@@ -381,7 +386,7 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: surfaceColor,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Column(
@@ -418,9 +423,12 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
+                        color: containerColor,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade200),
+                        border: Border.all(
+                            color: isDark
+                                ? Colors.grey.shade700
+                                : Colors.grey.shade200),
                       ),
                       child: Row(
                         children: [

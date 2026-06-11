@@ -131,6 +131,7 @@ class PaymentsScreen extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -148,12 +149,11 @@ class _AddPaymentSheet extends StatefulWidget {
 }
 
 class _AddPaymentSheetState extends State<_AddPaymentSheet> {
-  // On garde l'objet InvoiceModel pour le save mais le dropdown utilise
-  // l'ID (String) pour éviter l'assertion lors des rebuilds du stream.
   InvoiceModel? _selectedInvoice;
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   final _refCtrl = TextEditingController();
+  final _methodNameCtrl = TextEditingController();
   DateTime _date = DateTime.now();
   bool _saving = false;
   PaymentMethodModel? _selectedMethod;
@@ -163,15 +163,19 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
     _amountCtrl.dispose();
     _noteCtrl.dispose();
     _refCtrl.dispose();
+    _methodNameCtrl.dispose();
     super.dispose();
   }
 
   InputDecoration _field(String label, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon, color: const Color(0xFF43A047)),
       filled: true,
-      fillColor: const Color(0xFFF6FBFA),
+      fillColor: isDark
+          ? Theme.of(context).colorScheme.surfaceContainerHighest
+          : const Color(0xFFF6FBFA),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
@@ -204,7 +208,8 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
             note: _noteCtrl.text.trim(),
             paidAt: _date,
             paymentMethodId: _selectedMethod?.id ?? '',
-            paymentMethodLabel: _selectedMethod?.label ?? '',
+            paymentMethodLabel:
+                _selectedMethod?.label ?? _methodNameCtrl.text.trim(),
             paymentReference: _refCtrl.text.trim(),
           );
       if (mounted) Navigator.pop(context);
@@ -220,6 +225,11 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final containerColor = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : const Color(0xFFF6FBFA);
+
     return Padding(
       padding: EdgeInsets.fromLTRB(
           24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
@@ -248,15 +258,13 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
           ),
           const SizedBox(height: 20),
 
-          // Sélection facture via StreamBuilder
+          // Sélection facture via StreamBuilder — toutes les factures
           StreamBuilder<List<InvoiceModel>>(
             stream: context.read<InvoiceProvider>().watchInvoices(),
             builder: (context, snapshot) {
-              final open = (snapshot.data ?? [])
-                  .where((inv) => !inv.isFullyPaid)
-                  .toList();
+              final invoices = snapshot.data ?? [];
 
-              if (open.isEmpty) {
+              if (invoices.isEmpty) {
                 return Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -271,7 +279,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Aucune facture en attente de paiement.',
+                          'Aucune facture trouvée.',
                           style: TextStyle(fontSize: 13),
                         ),
                       ),
@@ -280,18 +288,18 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                 );
               }
 
-              // Valeur stable (ID String) — évite l'assertion quand le
-              // stream reconstruit de nouvelles instances d'InvoiceModel.
-              final selectedId = open.any((i) => i.id == _selectedInvoice?.id)
-                  ? _selectedInvoice?.id
-                  : null;
+              final selectedId =
+                  invoices.any((i) => i.id == _selectedInvoice?.id)
+                      ? _selectedInvoice?.id
+                      : null;
 
               return DropdownButtonFormField<String>(
                 value: selectedId,
                 isExpanded: true,
                 decoration: _field('Facture', Icons.receipt_long_outlined),
                 hint: const Text('Sélectionner une facture'),
-                items: open.map((inv) {
+                items: invoices.map((inv) {
+                  final isPaid = inv.isFullyPaid;
                   return DropdownMenuItem<String>(
                     value: inv.id,
                     child: Text.rich(
@@ -299,14 +307,21 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                         children: [
                           TextSpan(
                             text: inv.title,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 13),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: isPaid ? Colors.grey[500] : null,
+                            ),
                           ),
                           TextSpan(
-                            text:
-                                '  •  ${inv.clientName}  –  ${CurrencyFormatter.format(inv.remainingAmount)}',
+                            text: isPaid
+                                ? '  •  Soldée'
+                                : '  •  ${inv.clientName}  –  ${CurrencyFormatter.format(inv.remainingAmount)}',
                             style: TextStyle(
-                                fontSize: 11, color: Colors.grey[600]),
+                                fontSize: 11,
+                                color: isPaid
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600]),
                           ),
                         ],
                       ),
@@ -316,10 +331,11 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                 }).toList(),
                 onChanged: (id) {
                   if (id == null || !mounted) return;
-                  final inv = open.firstWhere((i) => i.id == id);
+                  final inv = invoices.firstWhere((i) => i.id == id);
                   setState(() {
                     _selectedInvoice = inv;
-                    if (_amountCtrl.text.isEmpty) {
+                    if (_amountCtrl.text.isEmpty &&
+                        inv.remainingAmount > 0) {
                       _amountCtrl.text =
                           inv.remainingAmount.toStringAsFixed(0);
                     }
@@ -346,18 +362,20 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
           ),
           const SizedBox(height: 12),
 
-          // Moyen de paiement (optionnel)
+          // Moyen de paiement
           _PaymentMethodDropdown(
             selected: _selectedMethod,
             onChanged: (m) => setState(() => _selectedMethod = m),
+            fallbackNameCtrl: _methodNameCtrl,
           ),
           const SizedBox(height: 12),
 
-          // Référence (optionnel)
+          // Référence
           TextField(
             controller: _refCtrl,
-            decoration:
-                _field('Référence / ID transaction (optionnel)', Icons.tag_outlined),
+            decoration: _field(
+                'Référence / ID transaction (optionnel)',
+                Icons.tag_outlined),
           ),
           const SizedBox(height: 12),
 
@@ -377,7 +395,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFF6FBFA),
+                color: containerColor,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Row(
@@ -441,9 +459,13 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
 class _PaymentMethodDropdown extends StatelessWidget {
   final PaymentMethodModel? selected;
   final ValueChanged<PaymentMethodModel?> onChanged;
+  final TextEditingController? fallbackNameCtrl;
 
-  const _PaymentMethodDropdown(
-      {required this.selected, required this.onChanged});
+  const _PaymentMethodDropdown({
+    required this.selected,
+    required this.onChanged,
+    this.fallbackNameCtrl,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -452,7 +474,31 @@ class _PaymentMethodDropdown extends StatelessWidget {
         .profile
         .enabledPaymentMethods;
 
-    if (methods.isEmpty) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fillColor = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : const Color(0xFFF6FBFA);
+
+    const decoration = InputDecoration(
+      labelText: 'Moyen de paiement (optionnel)',
+      prefixIcon: Icon(Icons.account_balance_wallet_outlined,
+          color: Color(0xFF43A047)),
+      filled: true,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(14)),
+        borderSide: BorderSide.none,
+      ),
+    );
+
+    if (methods.isEmpty) {
+      return TextField(
+        controller: fallbackNameCtrl,
+        decoration: decoration.copyWith(
+          fillColor: fillColor,
+          hintText: 'Ex: Orange Money, Virement…',
+        ),
+      );
+    }
 
     final selectedId =
         methods.any((m) => m.id == selected?.id) ? selected?.id : null;
@@ -460,17 +506,7 @@ class _PaymentMethodDropdown extends StatelessWidget {
     return DropdownButtonFormField<String>(
       value: selectedId,
       isExpanded: true,
-      decoration: InputDecoration(
-        labelText: 'Moyen de paiement (optionnel)',
-        prefixIcon: const Icon(Icons.account_balance_wallet_outlined,
-            color: Color(0xFF43A047)),
-        filled: true,
-        fillColor: const Color(0xFFF6FBFA),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-      ),
+      decoration: decoration.copyWith(fillColor: fillColor),
       hint: const Text('Sélectionner (optionnel)'),
       items: [
         const DropdownMenuItem<String>(

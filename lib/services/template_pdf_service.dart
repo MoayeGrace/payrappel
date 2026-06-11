@@ -678,8 +678,13 @@ class TemplatePdfService {
     _RenderCtx c, {
     PdfColor defaultColor = _kTextGrey,
   }) {
+    final align = section.alignment == 'center'
+        ? pw.CrossAxisAlignment.center
+        : section.alignment == 'right'
+            ? pw.CrossAxisAlignment.end
+            : pw.CrossAxisAlignment.start;
     return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      crossAxisAlignment: align,
       children: section.fields.map((f) {
         final text = _resolveField(f, c);
         if (text.isEmpty) return pw.SizedBox();

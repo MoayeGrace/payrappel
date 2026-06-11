@@ -156,6 +156,13 @@ class InvoiceTemplateModel {
   final TemplateSectionModel bottomLeft;
   final TemplateSectionModel bottomRight;
   final TemplateSectionModel bottomCenter;
+  // ── Table (corps de la facture) ───────────────────────────────────────────
+  final String tableDescLabel;
+  final String tableQtyLabel;
+  final String tablePriceLabel;
+  final String tableTotalLabel;
+  final bool tableShowQty;
+  final bool tableShowUnitPrice;
 
   const InvoiceTemplateModel({
     required this.id,
@@ -174,6 +181,12 @@ class InvoiceTemplateModel {
     required this.bottomLeft,
     required this.bottomRight,
     required this.bottomCenter,
+    this.tableDescLabel = 'Description',
+    this.tableQtyLabel = 'Qté',
+    this.tablePriceLabel = 'Prix unit.',
+    this.tableTotalLabel = 'Montant',
+    this.tableShowQty = true,
+    this.tableShowUnitPrice = true,
   });
 
   factory InvoiceTemplateModel.fromMap(Map<String, dynamic> m, String id) =>
@@ -204,6 +217,12 @@ class InvoiceTemplateModel {
             m['bottomRight'] as Map<String, dynamic>? ?? {}),
         bottomCenter: TemplateSectionModel.fromMap(
             m['bottomCenter'] as Map<String, dynamic>? ?? {}),
+        tableDescLabel: m['tableDescLabel'] as String? ?? 'Description',
+        tableQtyLabel: m['tableQtyLabel'] as String? ?? 'Qté',
+        tablePriceLabel: m['tablePriceLabel'] as String? ?? 'Prix unit.',
+        tableTotalLabel: m['tableTotalLabel'] as String? ?? 'Montant',
+        tableShowQty: m['tableShowQty'] as bool? ?? true,
+        tableShowUnitPrice: m['tableShowUnitPrice'] as bool? ?? true,
       );
 
   Map<String, dynamic> toMap() => {
@@ -222,6 +241,12 @@ class InvoiceTemplateModel {
         'bottomLeft': bottomLeft.toMap(),
         'bottomRight': bottomRight.toMap(),
         'bottomCenter': bottomCenter.toMap(),
+        'tableDescLabel': tableDescLabel,
+        'tableQtyLabel': tableQtyLabel,
+        'tablePriceLabel': tablePriceLabel,
+        'tableTotalLabel': tableTotalLabel,
+        'tableShowQty': tableShowQty,
+        'tableShowUnitPrice': tableShowUnitPrice,
       };
 
   InvoiceTemplateModel copyWith({
@@ -240,6 +265,12 @@ class InvoiceTemplateModel {
     TemplateSectionModel? bottomLeft,
     TemplateSectionModel? bottomRight,
     TemplateSectionModel? bottomCenter,
+    String? tableDescLabel,
+    String? tableQtyLabel,
+    String? tablePriceLabel,
+    String? tableTotalLabel,
+    bool? tableShowQty,
+    bool? tableShowUnitPrice,
   }) =>
       InvoiceTemplateModel(
         id: id,
@@ -259,6 +290,12 @@ class InvoiceTemplateModel {
         bottomLeft: bottomLeft ?? this.bottomLeft,
         bottomRight: bottomRight ?? this.bottomRight,
         bottomCenter: bottomCenter ?? this.bottomCenter,
+        tableDescLabel: tableDescLabel ?? this.tableDescLabel,
+        tableQtyLabel: tableQtyLabel ?? this.tableQtyLabel,
+        tablePriceLabel: tablePriceLabel ?? this.tablePriceLabel,
+        tableTotalLabel: tableTotalLabel ?? this.tableTotalLabel,
+        tableShowQty: tableShowQty ?? this.tableShowQty,
+        tableShowUnitPrice: tableShowUnitPrice ?? this.tableShowUnitPrice,
       );
 }
 

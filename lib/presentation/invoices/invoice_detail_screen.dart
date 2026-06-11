@@ -845,12 +845,10 @@ class _TemplatePickerSheetState extends State<_TemplatePickerSheet> {
   @override
   Widget build(BuildContext context) {
     final templates = widget.provider.allTemplates;
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.7,
-      minChildSize: 0.4,
-      maxChildSize: 0.92,
-      builder: (ctx, scrollCtrl) => Column(
+    final sheetHeight = MediaQuery.sizeOf(context).height * 0.75;
+    return SizedBox(
+      height: sheetHeight,
+      child: Column(
         children: [
           const SizedBox(height: 12),
           Container(
@@ -878,7 +876,6 @@ class _TemplatePickerSheetState extends State<_TemplatePickerSheet> {
           const SizedBox(height: 12),
           Expanded(
             child: ListView.builder(
-              controller: scrollCtrl,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: templates.length,
               itemBuilder: (_, i) {
@@ -993,6 +990,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   final _refCtrl = TextEditingController();
+  final _methodNameCtrl = TextEditingController();
   DateTime _date = DateTime.now();
   bool _saving = false;
   PaymentMethodModel? _selectedMethod;
@@ -1000,6 +998,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
   @override
   void dispose() {
     _amountCtrl.dispose();
+    _methodNameCtrl.dispose();
     _noteCtrl.dispose();
     _refCtrl.dispose();
     super.dispose();
@@ -1022,7 +1021,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
             note: _noteCtrl.text.trim(),
             paidAt: _date,
             paymentMethodId: _selectedMethod?.id ?? '',
-            paymentMethodLabel: _selectedMethod?.label ?? '',
+            paymentMethodLabel: _selectedMethod?.label ?? _methodNameCtrl.text.trim(),
             paymentReference: _refCtrl.text.trim(),
           );
       if (mounted) Navigator.pop(context);
@@ -1102,6 +1101,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
           _PaymentMethodDropdown(
             selected: _selectedMethod,
             onChanged: (m) => setState(() => _selectedMethod = m),
+            fallbackNameCtrl: _methodNameCtrl,
           ),
           const SizedBox(height: 12),
           // Référence (optionnel)
@@ -1196,8 +1196,13 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
 class _PaymentMethodDropdown extends StatelessWidget {
   final PaymentMethodModel? selected;
   final ValueChanged<PaymentMethodModel?> onChanged;
+  final TextEditingController? fallbackNameCtrl;
 
-  const _PaymentMethodDropdown({required this.selected, required this.onChanged});
+  const _PaymentMethodDropdown({
+    required this.selected,
+    required this.onChanged,
+    this.fallbackNameCtrl,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1206,7 +1211,26 @@ class _PaymentMethodDropdown extends StatelessWidget {
         .profile
         .enabledPaymentMethods;
 
-    if (methods.isEmpty) return const SizedBox.shrink();
+    const decoration = InputDecoration(
+      labelText: 'Moyen de paiement (optionnel)',
+      prefixIcon: Icon(Icons.account_balance_wallet_outlined,
+          color: Color(0xFF00BFA5)),
+      filled: true,
+      fillColor: Color(0xFFF6FBFA),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(14)),
+        borderSide: BorderSide.none,
+      ),
+    );
+
+    if (methods.isEmpty) {
+      return TextField(
+        controller: fallbackNameCtrl,
+        decoration: decoration.copyWith(
+          hintText: 'Ex: Orange Money, Virement…',
+        ),
+      );
+    }
 
     final selectedId =
         methods.any((m) => m.id == selected?.id) ? selected?.id : null;
@@ -1214,17 +1238,7 @@ class _PaymentMethodDropdown extends StatelessWidget {
     return DropdownButtonFormField<String>(
       value: selectedId,
       isExpanded: true,
-      decoration: InputDecoration(
-        labelText: 'Moyen de paiement (optionnel)',
-        prefixIcon: const Icon(Icons.account_balance_wallet_outlined,
-            color: Color(0xFF00BFA5)),
-        filled: true,
-        fillColor: const Color(0xFFF6FBFA),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-      ),
+      decoration: decoration,
       hint: const Text('Sélectionner (optionnel)'),
       items: [
         const DropdownMenuItem<String>(

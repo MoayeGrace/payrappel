@@ -216,84 +216,60 @@ class _HomeAppBar extends StatelessWidget {
 // ── Welcome Banner ─────────────────────────────────────────────────────────────
 class _WelcomeBanner extends StatelessWidget {
   final String name;
-  const _WelcomeBanner({required this.name});
+
+  const _WelcomeBanner({
+    required this.name,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 130,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1565C0), Color(0xFF00BFA5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
+      height: 160,
       clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+      ),
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          // Cercles décoratifs
-          Positioned(
-            right: -20,
-            bottom: -30,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.07),
-                shape: BoxShape.circle,
+          Image.asset(
+            'assets/money.jpg',
+            fit: BoxFit.cover,
+          ),
+
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withOpacity(0.55),
+                  Colors.black.withOpacity(0.25),
+                ],
+                begin: Alignment.bottomLeft,
+                end: Alignment.topRight,
               ),
             ),
           ),
-          Positioned(
-            right: 30,
-            top: -20,
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.06),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          // Icône portefeuille
-          Positioned(
-            right: 20,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: Icon(
-                Icons.account_balance_wallet_rounded,
-                size: 72,
-                color: Colors.white.withOpacity(0.85),
-              ),
-            ),
-          ),
-          // Texte
-          Positioned(
-            left: 20,
-            top: 24,
-            right: 110,
+
+          Padding(
+            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'Bonjour, $name 👋',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 19,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  "Voici la situation de votre activité aujourd'hui.",
+                  "Voici la situation de votre activité aujourd'hui",
                   style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    height: 1.4,
+                    color: Colors.white,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -399,38 +375,10 @@ class _StatsSectionState extends State<_StatsSection> {
                 if (_showChart)
                   _PaymentsChart(payments: payments)
                 else
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          label: 'À encaisser',
-                          value: CurrencyFormatter.format(totalToCollect),
-                          subtitle: 'Total dû par les clients',
-                          icon: Icons.account_balance_wallet_outlined,
-                          color: const Color(0xFF1A73E8),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _StatCard(
-                          label: 'En retard',
-                          value: CurrencyFormatter.format(lateAmount),
-                          subtitle: 'Créances échues',
-                          icon: Icons.access_time_outlined,
-                          color: const Color(0xFFE53935),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _StatCard(
-                          label: 'Paiements reçus',
-                          value: CurrencyFormatter.format(monthPayments),
-                          subtitle: 'Ce mois-ci',
-                          icon: Icons.check_circle_outline,
-                          color: const Color(0xFF43A047),
-                        ),
-                      ),
-                    ],
+                  _OverviewCard(
+                    totalToCollect: totalToCollect,
+                    lateAmount: lateAmount,
+                    monthPayments: monthPayments,
                   ),
               ],
             );
@@ -678,21 +626,18 @@ class _PaymentsChartState extends State<_PaymentsChart> {
               const Icon(Icons.bar_chart_rounded,
                   size: 16, color: Color(0xFF1A73E8)),
               const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Paiements reçus — $_chartTitle',
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A73E8)),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              const Text(
+                'Paiements reçus',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A73E8)),
               ),
-              const SizedBox(width: 8),
+              const Spacer(),
               // Sélecteur période
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0F4FF),
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -750,6 +695,17 @@ class _PaymentsChartState extends State<_PaymentsChart> {
               ),
             ],
           ),
+
+          if (_period != _ChartPeriod.custom) ...[
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.only(left: 22),
+              child: Text(
+                _chartTitle,
+                style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+              ),
+            ),
+          ],
 
           // Indicateur de plage personnalisée sélectionnée
           if (_period == _ChartPeriod.custom && _customRange != null) ...[
@@ -1003,6 +959,98 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
+
+
+
+class _OverviewCard extends StatelessWidget {
+  final double totalToCollect;
+  final double lateAmount;
+  final double monthPayments;
+
+  const _OverviewCard({
+    required this.totalToCollect,
+    required this.lateAmount,
+    required this.monthPayments,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final recoveryRate = totalToCollect == 0 ? 100 : ((monthPayments / totalToCollect) * 100).clamp(0, 100).round();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: _OverviewItem(icon: Icons.account_balance_wallet_outlined, iconColor: Colors.blue, label: 'À encaisser', value: CurrencyFormatter.format(totalToCollect), subtitle: 'Total dû par les clients')),
+              Container(width: 1,height: 130,color: Colors.white24),
+              Expanded(child: _OverviewItem(icon: Icons.access_time, iconColor: Colors.red, label: 'En retard', value: CurrencyFormatter.format(lateAmount), subtitle: 'Créances échues')),
+              Container(width: 1,height: 130,color: Colors.white24),
+              Expanded(child: _OverviewItem(icon: Icons.check_circle_outline, iconColor: Colors.green, label: 'Paiements reçus', value: CurrencyFormatter.format(monthPayments), subtitle: 'Ce mois-ci')),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(16)),
+            child: Row(children: [
+              Container(
+                width: 42, height: 42,
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white24),
+                child: const Icon(Icons.trending_up, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Taux de recouvrement', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                Text('Ce mois-ci', style: TextStyle(color: Colors.white70, fontSize: 11)),
+              ])),
+              SizedBox(width: 52, height: 52, child: Stack(fit: StackFit.expand, children: [
+                CircularProgressIndicator(value: recoveryRate / 100, strokeWidth: 6, backgroundColor: Colors.white24),
+                Center(child: Text('$recoveryRate%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))),
+              ])),
+            ]),
+          )
+        ],
+      ),
+    );
+  }
+}
+
+class _OverviewItem extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+  final String subtitle;
+  const _OverviewItem({required this.icon,required this.iconColor,required this.label,required this.value,required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        CircleAvatar(radius: 20, backgroundColor: Colors.white, child: Icon(icon, color: iconColor, size: 20)),
+        const SizedBox(height: 8),
+        Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11)),
+        const SizedBox(height: 5),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(value, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        ),
+        const SizedBox(height: 2),
+        Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+      ],
+    );
+  }
+}
+
 
 // ── Menu Section ───────────────────────────────────────────────────────────────
 class _MenuSection extends StatelessWidget {

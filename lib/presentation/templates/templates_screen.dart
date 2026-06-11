@@ -27,11 +27,12 @@ class TemplatesScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _InfoBanner(),
+              const _InfoBanner(),
               const SizedBox(height: 20),
               _SectionLabel('Templates prédéfinis'),
               _TemplateGrid(
                 templates: builtins,
+                onTap: (t) => context.push('/templates/preview', extra: t),
                 onEdit: (t) => context.push('/templates/edit', extra: t),
               ),
               if (custom.isNotEmpty) ...[
@@ -39,6 +40,7 @@ class TemplatesScreen extends StatelessWidget {
                 _SectionLabel('Mes templates'),
                 _TemplateGrid(
                   templates: custom,
+                  onTap: (t) => context.push('/templates/preview', extra: t),
                   onEdit: (t) => context.push('/templates/edit', extra: t),
                   onDelete: (t) => _confirmDelete(context, prov, t),
                 ),
@@ -79,6 +81,8 @@ class TemplatesScreen extends StatelessWidget {
 // ── Info banner ──────────────────────────────────────────────────────────────
 
 class _InfoBanner extends StatelessWidget {
+  const _InfoBanner();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -144,11 +148,13 @@ class _SectionLabel extends StatelessWidget {
 
 class _TemplateGrid extends StatelessWidget {
   final List<InvoiceTemplateModel> templates;
+  final ValueChanged<InvoiceTemplateModel> onTap;
   final ValueChanged<InvoiceTemplateModel> onEdit;
   final ValueChanged<InvoiceTemplateModel>? onDelete;
 
   const _TemplateGrid({
     required this.templates,
+    required this.onTap,
     required this.onEdit,
     this.onDelete,
   });
@@ -169,6 +175,7 @@ class _TemplateGrid extends StatelessWidget {
         final t = templates[index];
         return _TemplateCard(
           template: t,
+          onTap: () => onTap(t),
           onEdit: () => onEdit(t),
           onDelete: onDelete != null ? () => onDelete!(t) : null,
         );
@@ -181,11 +188,13 @@ class _TemplateGrid extends StatelessWidget {
 
 class _TemplateCard extends StatelessWidget {
   final InvoiceTemplateModel template;
+  final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback? onDelete;
 
   const _TemplateCard({
     required this.template,
+    required this.onTap,
     required this.onEdit,
     this.onDelete,
   });
@@ -193,7 +202,7 @@ class _TemplateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onEdit,
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -231,29 +240,32 @@ class _TemplateCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // Edit overlay on tap
-                  Positioned.fill(
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: onEdit,
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            color: Colors.black.withOpacity(0.15),
-                            child: const Text(
-                              'Personnaliser',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w600),
-                            ),
+                  // Bandeau bas : "Aperçu" (tap principal) | icône édition rapide
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      color: Colors.black.withOpacity(0.18),
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'Aperçu',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w600),
                           ),
-                        ),
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: onEdit,
+                            child: const Icon(Icons.tune,
+                                color: Colors.white, size: 10),
+                          ),
+                        ],
                       ),
                     ),
                   ),

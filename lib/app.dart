@@ -24,6 +24,7 @@ import 'presentation/settings/business_profile_screen.dart';
 import 'presentation/settings/payment_methods_screen.dart';
 import 'presentation/templates/templates_screen.dart';
 import 'presentation/templates/template_editor_screen.dart';
+import 'presentation/templates/template_preview_screen.dart';
 import 'presentation/splash/splash_screen.dart';
 import 'presentation/onboarding/onboarding_screen.dart';
 import 'providers/client_provider.dart';
@@ -86,6 +87,11 @@ final _router = GoRouter(
     GoRoute(
       path: '/templates',
       builder: (_, __) => const TemplatesScreen(),
+    ),
+    GoRoute(
+      path: '/templates/preview',
+      builder: (_, state) =>
+          TemplatePreviewScreen(template: state.extra as dynamic),
     ),
     GoRoute(
       path: '/templates/edit',

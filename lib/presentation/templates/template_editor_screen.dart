@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/invoice_template_model.dart';
+import '../../data/models/payment_method_model.dart';
+import '../../providers/business_profile_provider.dart';
 import '../../providers/invoice_template_provider.dart';
 import 'template_preview_widget.dart';
 
@@ -17,6 +19,10 @@ class TemplateEditorScreen extends StatefulWidget {
 class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
   late InvoiceTemplateModel _template;
   late final TextEditingController _nameCtrl;
+  late final TextEditingController _tableDescCtrl;
+  late final TextEditingController _tableQtyCtrl;
+  late final TextEditingController _tablePriceCtrl;
+  late final TextEditingController _tableTotalCtrl;
   final ScrollController _scrollCtrl = ScrollController();
   bool _saving = false;
 
@@ -31,11 +37,19 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
     _template = widget.template;
     final suffix = _template.isBuiltIn ? ' (Copie)' : '';
     _nameCtrl = TextEditingController(text: '${_template.name}$suffix');
+    _tableDescCtrl = TextEditingController(text: _template.tableDescLabel);
+    _tableQtyCtrl = TextEditingController(text: _template.tableQtyLabel);
+    _tablePriceCtrl = TextEditingController(text: _template.tablePriceLabel);
+    _tableTotalCtrl = TextEditingController(text: _template.tableTotalLabel);
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _tableDescCtrl.dispose();
+    _tableQtyCtrl.dispose();
+    _tablePriceCtrl.dispose();
+    _tableTotalCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -65,7 +79,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
       final toSave = InvoiceTemplateModel(
         id: _template.id,
         name: name,
-        isBuiltIn: false,
+        isBuiltIn: _template.isBuiltIn,
         accentColor: _template.accentColor,
         headerBgColor: _template.headerBgColor,
         layout: _template.layout,
@@ -79,6 +93,12 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
         bottomLeft: _template.bottomLeft,
         bottomRight: _template.bottomRight,
         bottomCenter: _template.bottomCenter,
+        tableDescLabel: _template.tableDescLabel,
+        tableQtyLabel: _template.tableQtyLabel,
+        tablePriceLabel: _template.tablePriceLabel,
+        tableTotalLabel: _template.tableTotalLabel,
+        tableShowQty: _template.tableShowQty,
+        tableShowUnitPrice: _template.tableShowUnitPrice,
       );
       await context.read<InvoiceTemplateProvider>().saveCustomTemplate(toSave);
       if (mounted) {
@@ -125,18 +145,24 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
             ),
         ],
       ),
-      body: ListView(
-        controller: _scrollCtrl,
-        padding: const EdgeInsets.all(16),
+      body: Column(
         children: [
-          // ── Prévisualisation live ─────────────────────────────────────────
-          _SectionHeader('Aperçu'),
-          _LivePreviewCard(
-            template: _template,
-            onTapSection: _scrollToSection,
+          // ── Prévisualisation live (fixe, toujours visible) ─────────────
+          Container(
+            color: Theme.of(context).colorScheme.surface,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: _LivePreviewCard(
+              template: _template,
+              onTapSection: _scrollToSection,
+            ),
           ),
-          const SizedBox(height: 20),
-
+          Divider(height: 1, color: Colors.grey.shade200),
+          // ── Options (défilables) ───────────────────────────────────────
+          Expanded(
+            child: ListView(
+              controller: _scrollCtrl,
+              padding: const EdgeInsets.all(16),
+              children: [
           // ── Nom ──────────────────────────────────────────────────────────
           _SectionHeader('Nom du template'),
           _Card(
@@ -215,6 +241,147 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
                   onChanged: (v) => setState(
                       () => _template = _template.copyWith(showPaymentMethods: v)),
                 ),
+                if (_template.showPaymentMethods) ...[
+                  const Divider(height: 1),
+                  const SizedBox(height: 8),
+                  Consumer<BusinessProfileProvider>(
+                    builder: (_, profileProv, __) {
+                      final methods = profileProv.profile.paymentMethods
+                          .where((m) => m.isEnabled)
+                          .toList();
+                      if (methods.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(children: [
+                            Icon(Icons.info_outline, size: 14, color: Colors.grey[400]),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Aucun moyen de paiement configuré. Allez dans Paramètres → Moyens de paiement.',
+                                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                              ),
+                            ),
+                          ]),
+                        );
+                      }
+                      final selected = _template.selectedPaymentMethodIds.toSet();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Text('Choisir les méthodes à afficher',
+                                style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.w600)),
+                          ),
+                          ...methods.map((m) {
+                            final isChecked = selected.isEmpty || selected.contains(m.id);
+                            return _PaymentMethodCheckTile(
+                              method: m,
+                              checked: isChecked,
+                              onChanged: (v) {
+                                final newSelected = Set<String>.from(selected.isEmpty
+                                    ? methods.map((x) => x.id)
+                                    : selected);
+                                if (v) { newSelected.add(m.id); } else { newSelected.remove(m.id); }
+                                setState(() => _template = _template.copyWith(
+                                    selectedPaymentMethodIds: newSelected.toList()));
+                              },
+                            );
+                          }),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Tableau des prestations ───────────────────────────────────────
+          _SectionHeader('Tableau des prestations'),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                  title: const Text('Colonne Quantité',
+                      style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                  subtitle: const Text('Afficher la colonne Qté dans le tableau',
+                      style: TextStyle(fontSize: 11)),
+                  value: _template.tableShowQty,
+                  activeColor: const Color(0xFF1A73E8),
+                  onChanged: (v) => setState(
+                      () => _template = _template.copyWith(tableShowQty: v)),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                  title: const Text('Colonne Prix unitaire',
+                      style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                  subtitle: const Text('Afficher la colonne Prix unit. dans le tableau',
+                      style: TextStyle(fontSize: 11)),
+                  value: _template.tableShowUnitPrice,
+                  activeColor: const Color(0xFF1A73E8),
+                  onChanged: (v) => setState(
+                      () => _template = _template.copyWith(tableShowUnitPrice: v)),
+                ),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _tableDescCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'En-tête : Description',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                  onChanged: (v) => setState(() => _template = _template.copyWith(
+                      tableDescLabel: v.trim().isEmpty ? 'Description' : v.trim())),
+                ),
+                const SizedBox(height: 8),
+                if (_template.tableShowQty) ...[
+                  TextFormField(
+                    controller: _tableQtyCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'En-tête : Quantité',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                    onChanged: (v) => setState(() => _template = _template.copyWith(
+                        tableQtyLabel: v.trim().isEmpty ? 'Qté' : v.trim())),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (_template.tableShowUnitPrice) ...[
+                  TextFormField(
+                    controller: _tablePriceCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'En-tête : Prix unitaire',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                    onChanged: (v) => setState(() => _template = _template.copyWith(
+                        tablePriceLabel:
+                            v.trim().isEmpty ? 'Prix unit.' : v.trim())),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                TextFormField(
+                  controller: _tableTotalCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'En-tête : Total',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                  onChanged: (v) => setState(() => _template = _template.copyWith(
+                      tableTotalLabel: v.trim().isEmpty ? 'Montant' : v.trim())),
+                ),
               ],
             ),
           ),
@@ -228,6 +395,9 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
           const SizedBox(height: 32),
         ],
       ),
+    ),
+  ],
+),
     );
   }
 
@@ -839,6 +1009,62 @@ class _TapZone extends StatelessWidget {
                   color: Colors.white, fontSize: 7, fontWeight: FontWeight.w600),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Payment method check tile ─────────────────────────────────────────────────
+
+class _PaymentMethodCheckTile extends StatelessWidget {
+  final PaymentMethodModel method;
+  final bool checked;
+  final ValueChanged<bool> onChanged;
+
+  const _PaymentMethodCheckTile({
+    required this.method,
+    required this.checked,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = method.type.color;
+    return InkWell(
+      onTap: () => onChanged(!checked),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: method.type.assetPath != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(method.type.assetPath!, fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(method.type.icon, size: 16, color: color)),
+                    )
+                  : Icon(method.type.icon, size: 16, color: color),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(method.label,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            ),
+            Checkbox(
+              value: checked,
+              activeColor: const Color(0xFF1A73E8),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onChanged: (v) => onChanged(v ?? false),
+            ),
+          ],
         ),
       ),
     );
