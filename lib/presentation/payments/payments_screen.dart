@@ -307,7 +307,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                   );
                 }).toList(),
                 onChanged: (id) {
-                  if (id == null) return;
+                  if (id == null || !mounted) return;
                   final inv = open.firstWhere((i) => i.id == id);
                   setState(() {
                     _selectedInvoice = inv;

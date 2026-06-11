@@ -192,8 +192,9 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
 
     final newLabel = labelCtrl.text.trim();
     final newValue = valueCtrl.text.trim();
-    labelCtrl.dispose();
-    valueCtrl.dispose();
+    // Pas de dispose() manuel : le dialogue n'est pas encore démonté à ce
+    // stade, les TextField appelleraient removeListener sur un contrôleur
+    // déjà disposé. Ces variables locales sont GC'd à la fin de la fonction.
 
     if (confirmed == true && mounted && newLabel.isNotEmpty) {
       setState(() {
