@@ -17,7 +17,13 @@ class TemplateEditorScreen extends StatefulWidget {
 class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
   late InvoiceTemplateModel _template;
   late final TextEditingController _nameCtrl;
+  final ScrollController _scrollCtrl = ScrollController();
   bool _saving = false;
+
+  // One GlobalKey per section — used by the live preview to scroll-to-section.
+  final Map<TemplateSectionId, GlobalKey> _sectionKeys = {
+    for (final id in TemplateSectionId.values) id: GlobalKey(),
+  };
 
   @override
   void initState() {
@@ -30,7 +36,20 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  void _scrollToSection(TemplateSectionId id) {
+    final key = _sectionKeys[id];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+        alignment: 0.1,
+      );
+    }
   }
 
   Future<void> _save() async {
@@ -107,11 +126,15 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
         ],
       ),
       body: ListView(
+        controller: _scrollCtrl,
         padding: const EdgeInsets.all(16),
         children: [
           // ── Prévisualisation live ─────────────────────────────────────────
           _SectionHeader('Aperçu'),
-          _LivePreviewCard(template: _template),
+          _LivePreviewCard(
+            template: _template,
+            onTapSection: _scrollToSection,
+          ),
           const SizedBox(height: 20),
 
           // ── Nom ──────────────────────────────────────────────────────────
@@ -221,6 +244,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
     return sections.map(((String label, TemplateSectionModel section, TemplateSectionId id) rec) {
       final (label, section, id) = rec;
       return Padding(
+        key: _sectionKeys[id],
         padding: const EdgeInsets.only(bottom: 10),
         child: _SectionEditor(
           label: label,
@@ -723,7 +747,9 @@ class _Card extends StatelessWidget {
 
 class _LivePreviewCard extends StatelessWidget {
   final InvoiceTemplateModel template;
-  const _LivePreviewCard({required this.template});
+  final void Function(TemplateSectionId id)? onTapSection;
+
+  const _LivePreviewCard({required this.template, this.onTapSection});
 
   @override
   Widget build(BuildContext context) {
@@ -743,7 +769,75 @@ class _LivePreviewCard extends StatelessWidget {
               ],
             ),
             clipBehavior: Clip.hardEdge,
-            child: TemplateMiniPreview(template: template),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                TemplateMiniPreview(template: template),
+                if (onTapSection != null)
+                  Positioned.fill(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: 55,
+                          child: _TapZone(
+                            label: 'En-tête',
+                            labelAlign: Alignment.topRight,
+                            onTap: () => onTapSection!(TemplateSectionId.topCenter),
+                          ),
+                        ),
+                        const Spacer(),
+                        SizedBox(
+                          height: 35,
+                          child: _TapZone(
+                            label: 'Pied de page',
+                            labelAlign: Alignment.bottomRight,
+                            onTap: () => onTapSection!(TemplateSectionId.bottomCenter),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TapZone extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final Alignment labelAlign;
+
+  const _TapZone({
+    required this.label,
+    required this.onTap,
+    this.labelAlign = Alignment.topRight,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Align(
+        alignment: labelAlign,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              label,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 7, fontWeight: FontWeight.w600),
+            ),
           ),
         ),
       ),

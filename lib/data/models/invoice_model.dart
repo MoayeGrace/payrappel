@@ -13,6 +13,7 @@ class InvoiceModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<Map<String, String>> customFields;
+  final String? templateId;
 
   const InvoiceModel({
     required this.id,
@@ -27,6 +28,7 @@ class InvoiceModel {
     required this.createdAt,
     required this.updatedAt,
     this.customFields = const [],
+    this.templateId,
   });
 
   double get remainingAmount => totalAmount - paidAmount;
@@ -58,6 +60,7 @@ class InvoiceModel {
               ?.map((e) => Map<String, String>.from(e as Map))
               .toList() ??
           [],
+      templateId: map['templateId'] as String?,
     );
   }
 
@@ -74,6 +77,7 @@ class InvoiceModel {
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
       'customFields': customFields,
+      if (templateId != null) 'templateId': templateId,
     };
   }
 
@@ -85,6 +89,8 @@ class InvoiceModel {
     InvoiceStatus? status,
     DateTime? updatedAt,
     List<Map<String, String>>? customFields,
+    String? templateId,
+    bool clearTemplateId = false,
   }) {
     return InvoiceModel(
       id: id,
@@ -99,6 +105,7 @@ class InvoiceModel {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       customFields: customFields ?? this.customFields,
+      templateId: clearTemplateId ? null : (templateId ?? this.templateId),
     );
   }
 }

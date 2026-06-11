@@ -18,6 +18,7 @@ import '../../providers/invoice_template_provider.dart';
 import '../../data/models/invoice_template_model.dart';
 import '../../services/pdf_service.dart';
 import '../../services/template_pdf_service.dart';
+import '../../services/word_service.dart';
 import 'invoices_screen.dart' show statusLabel;
 
 // ── Point d'entrée ─────────────────────────────────────────────────────────────
@@ -59,30 +60,47 @@ class _InvoiceDetailView extends StatefulWidget {
 
 class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
   bool _exportingPdf = false;
+  bool _exportingWord = false;
 
   InvoiceModel get invoice => widget.invoice;
 
-  Future<void> _exportPdf() async {
+  Future<InvoiceTemplateModel?> _pickTemplate() async {
     final templateProv = context.read<InvoiceTemplateProvider>();
-    final selected = await showModalBottomSheet<InvoiceTemplateModel>(
+    final preSelected = invoice.templateId != null
+        ? templateProv.allTemplates.firstWhere(
+            (t) => t.id == invoice.templateId,
+            orElse: () => templateProv.defaultTemplate)
+        : null;
+    return showModalBottomSheet<InvoiceTemplateModel>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => _TemplatePickerSheet(provider: templateProv),
+      builder: (ctx) => _TemplatePickerSheet(
+          provider: templateProv, initial: preSelected),
     );
+  }
+
+  Future<void> _exportPdf() async {
+    final selected = await _pickTemplate();
     if (selected == null || !mounted) return;
+
+    // Persist template choice
+    if (selected.id != invoice.templateId) {
+      context.read<InvoiceProvider>()
+          .updateInvoice(invoice.copyWith(templateId: selected.id));
+    }
 
     setState(() => _exportingPdf = true);
     final messenger = ScaffoldMessenger.of(context);
-    final clientProvider = context.read<ClientProvider>();
-    final paymentProvider = context.read<PaymentProvider>();
+    final clientProv = context.read<ClientProvider>();
+    final paymentProv = context.read<PaymentProvider>();
     final profile = context.read<BusinessProfileProvider>().profile;
     try {
-      final client = await clientProvider.getClient(invoice.clientId);
+      final client = await clientProv.getClient(invoice.clientId);
       final payments =
-          await paymentProvider.watchPaymentsByInvoice(invoice.id).first;
+          await paymentProv.watchPaymentsByInvoice(invoice.id).first;
       final bytes = await TemplatePdfService.generate(
         template: selected,
         invoice: invoice,
@@ -102,6 +120,47 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
       }
     } finally {
       if (mounted) setState(() => _exportingPdf = false);
+    }
+  }
+
+  Future<void> _exportWord() async {
+    setState(() => _exportingWord = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final clientProv = context.read<ClientProvider>();
+    final paymentProv = context.read<PaymentProvider>();
+    final profile = context.read<BusinessProfileProvider>().profile;
+    try {
+      final client = await clientProv.getClient(invoice.clientId);
+      final payments =
+          await paymentProv.watchPaymentsByInvoice(invoice.id).first;
+      await WordService.shareWord(
+        invoice: invoice,
+        payments: payments,
+        profile: profile,
+        clientPhone: client?.phone,
+        clientEmail: client?.email,
+      );
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text('Erreur Word : $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _exportingWord = false);
+    }
+  }
+
+  Future<void> _changeTemplate() async {
+    final selected = await _pickTemplate();
+    if (selected == null || !mounted) return;
+    context.read<InvoiceProvider>()
+        .updateInvoice(invoice.copyWith(templateId: selected.id));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Template "${selected.name}" enregistré'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -268,6 +327,52 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(height: 12),
+                const Divider(color: Colors.white24, height: 1),
+                const SizedBox(height: 10),
+                Consumer<InvoiceTemplateProvider>(
+                  builder: (_, prov, __) {
+                    final name = invoice.templateId != null
+                        ? prov.allTemplates
+                            .firstWhere((t) => t.id == invoice.templateId,
+                                orElse: () => prov.defaultTemplate)
+                            .name
+                        : prov.defaultTemplate.name;
+                    return Row(
+                      children: [
+                        const Icon(Icons.description_outlined,
+                            color: Colors.white70, size: 14),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Template : $name',
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _changeTemplate,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'Changer',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -401,31 +506,26 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
                         onTap: _openWhatsApp,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _exportingPdf
-                          ? Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1A73E8).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Color(0xFF1A73E8),
-                                  ),
-                                ),
-                              ),
-                            )
+                          ? _ExportingIndicator(color: const Color(0xFF1A73E8))
                           : _ActionButton(
                               icon: Icons.picture_as_pdf_outlined,
-                              label: 'Exporter PDF',
+                              label: 'PDF',
                               color: const Color(0xFF1A73E8),
                               onTap: _exportPdf,
+                            ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _exportingWord
+                          ? _ExportingIndicator(color: const Color(0xFF2B579A))
+                          : _ActionButton(
+                              icon: Icons.article_outlined,
+                              label: 'Word',
+                              color: const Color(0xFF2B579A),
+                              onTap: _exportWord,
                             ),
                     ),
                   ],
@@ -657,6 +757,29 @@ class _FinancialRow extends StatelessWidget {
   }
 }
 
+class _ExportingIndicator extends StatelessWidget {
+  final Color color;
+  const _ExportingIndicator({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2, color: color),
+        ),
+      ),
+    );
+  }
+}
+
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -703,7 +826,8 @@ class _ActionButton extends StatelessWidget {
 // ── Sheet sélection template ───────────────────────────────────────────────────
 class _TemplatePickerSheet extends StatefulWidget {
   final InvoiceTemplateProvider provider;
-  const _TemplatePickerSheet({required this.provider});
+  final InvoiceTemplateModel? initial;
+  const _TemplatePickerSheet({required this.provider, this.initial});
 
   @override
   State<_TemplatePickerSheet> createState() => _TemplatePickerSheetState();
@@ -715,7 +839,7 @@ class _TemplatePickerSheetState extends State<_TemplatePickerSheet> {
   @override
   void initState() {
     super.initState();
-    _selected = widget.provider.defaultTemplate;
+    _selected = widget.initial ?? widget.provider.defaultTemplate;
   }
 
   @override
