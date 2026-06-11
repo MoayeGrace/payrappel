@@ -73,3 +73,14 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/orange_money.png
+    - assets/moov-money.png
+    - assets/wave_money.png
+    - assets/mtn_momo.webp
+    - assets/Djamo-Logo.png
+    - assets/stripe.png
+    - assets/paypal.png
+    - assets/VISA.png
+    - assets/MASTERCARD.webp
+    - assets/icons/app_icon.png

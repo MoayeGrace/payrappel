@@ -17,6 +17,9 @@ class PaymentProvider extends ChangeNotifier {
     required double amount,
     String note = '',
     DateTime? paidAt,
+    String paymentMethodId = '',
+    String paymentMethodLabel = '',
+    String paymentReference = '',
   }) =>
       _repo.addPayment(
         invoiceId: invoiceId,
@@ -25,6 +28,9 @@ class PaymentProvider extends ChangeNotifier {
         amount: amount,
         note: note,
         paidAt: paidAt,
+        paymentMethodId: paymentMethodId,
+        paymentMethodLabel: paymentMethodLabel,
+        paymentReference: paymentReference,
       );
 
   Future<void> deletePayment(String paymentId, String invoiceId) =>

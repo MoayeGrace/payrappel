@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../data/models/invoice_model.dart';
+import '../../data/models/payment_method_model.dart';
 import '../../data/models/payment_model.dart';
 import '../../data/models/reminder_model.dart';
 import '../../providers/invoice_provider.dart';
@@ -13,7 +14,10 @@ import '../../providers/payment_provider.dart';
 import '../../providers/client_provider.dart';
 import '../../providers/reminder_provider.dart';
 import '../../providers/business_profile_provider.dart';
+import '../../providers/invoice_template_provider.dart';
+import '../../data/models/invoice_template_model.dart';
 import '../../services/pdf_service.dart';
+import '../../services/template_pdf_service.dart';
 import 'invoices_screen.dart' show statusLabel;
 
 // ── Point d'entrée ─────────────────────────────────────────────────────────────
@@ -59,6 +63,17 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
   InvoiceModel get invoice => widget.invoice;
 
   Future<void> _exportPdf() async {
+    final templateProv = context.read<InvoiceTemplateProvider>();
+    final selected = await showModalBottomSheet<InvoiceTemplateModel>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _TemplatePickerSheet(provider: templateProv),
+    );
+    if (selected == null || !mounted) return;
+
     setState(() => _exportingPdf = true);
     final messenger = ScaffoldMessenger.of(context);
     final clientProvider = context.read<ClientProvider>();
@@ -68,12 +83,14 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
       final client = await clientProvider.getClient(invoice.clientId);
       final payments =
           await paymentProvider.watchPaymentsByInvoice(invoice.id).first;
-      final bytes = await PdfService.generateInvoicePdf(
+      final bytes = await TemplatePdfService.generate(
+        template: selected,
         invoice: invoice,
         payments: payments,
         profile: profile,
         clientPhone: client?.phone,
         clientEmail: client?.email,
+        clientAddress: null,
       );
       await PdfService.sharePdf(
         bytes,
@@ -683,6 +700,151 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
+// ── Sheet sélection template ───────────────────────────────────────────────────
+class _TemplatePickerSheet extends StatefulWidget {
+  final InvoiceTemplateProvider provider;
+  const _TemplatePickerSheet({required this.provider});
+
+  @override
+  State<_TemplatePickerSheet> createState() => _TemplatePickerSheetState();
+}
+
+class _TemplatePickerSheetState extends State<_TemplatePickerSheet> {
+  late InvoiceTemplateModel _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.provider.defaultTemplate;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final templates = widget.provider.allTemplates;
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (ctx, scrollCtrl) => Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Icon(Icons.description_outlined, color: Color(0xFF1A73E8)),
+                SizedBox(width: 10),
+                Text(
+                  'Choisir un template',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.builder(
+              controller: scrollCtrl,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: templates.length,
+              itemBuilder: (_, i) {
+                final t = templates[i];
+                final isSelected = t.id == _selected.id;
+                final accent = Color(t.accentColor);
+                return GestureDetector(
+                  onTap: () => setState(() => _selected = t),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? accent.withOpacity(0.08)
+                          : Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isSelected ? accent : Colors.grey.shade200,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: accent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.description,
+                              color: Colors.white, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                t.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected ? accent : null,
+                                ),
+                              ),
+                              Text(
+                                t.layout.name[0].toUpperCase() +
+                                    t.layout.name.substring(1),
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey[500]),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          Icon(Icons.check_circle, color: accent),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            child: SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context, _selected),
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                label: const Text(
+                  'Générer PDF',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A73E8),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Sheet ajout paiement ───────────────────────────────────────────────────────
 void _showAddPaymentSheet(BuildContext context, InvoiceModel invoice) {
   showModalBottomSheet(
@@ -706,13 +868,16 @@ class _AddPaymentSheet extends StatefulWidget {
 class _AddPaymentSheetState extends State<_AddPaymentSheet> {
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _refCtrl = TextEditingController();
   DateTime _date = DateTime.now();
   bool _saving = false;
+  PaymentMethodModel? _selectedMethod;
 
   @override
   void dispose() {
     _amountCtrl.dispose();
     _noteCtrl.dispose();
+    _refCtrl.dispose();
     super.dispose();
   }
 
@@ -732,6 +897,9 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
             amount: amount,
             note: _noteCtrl.text.trim(),
             paidAt: _date,
+            paymentMethodId: _selectedMethod?.id ?? '',
+            paymentMethodLabel: _selectedMethod?.label ?? '',
+            paymentReference: _refCtrl.text.trim(),
           );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -797,6 +965,27 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
             decoration: InputDecoration(
               labelText: 'Note (optionnel)',
               prefixIcon: const Icon(Icons.note_outlined, color: Color(0xFF00BFA5)),
+              filled: true,
+              fillColor: const Color(0xFFF6FBFA),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Moyen de paiement (optionnel)
+          _PaymentMethodDropdown(
+            selected: _selectedMethod,
+            onChanged: (m) => setState(() => _selectedMethod = m),
+          ),
+          const SizedBox(height: 12),
+          // Référence (optionnel)
+          TextField(
+            controller: _refCtrl,
+            decoration: InputDecoration(
+              labelText: 'Référence / ID de transaction (optionnel)',
+              prefixIcon: const Icon(Icons.tag_outlined, color: Color(0xFF00BFA5)),
               filled: true,
               fillColor: const Color(0xFFF6FBFA),
               border: OutlineInputBorder(
@@ -875,6 +1064,63 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Dropdown moyen de paiement ─────────────────────────────────────────────────
+class _PaymentMethodDropdown extends StatelessWidget {
+  final PaymentMethodModel? selected;
+  final ValueChanged<PaymentMethodModel?> onChanged;
+
+  const _PaymentMethodDropdown({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final methods = context
+        .watch<BusinessProfileProvider>()
+        .profile
+        .enabledPaymentMethods;
+
+    if (methods.isEmpty) return const SizedBox.shrink();
+
+    final selectedId =
+        methods.any((m) => m.id == selected?.id) ? selected?.id : null;
+
+    return DropdownButtonFormField<String>(
+      value: selectedId,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'Moyen de paiement (optionnel)',
+        prefixIcon: const Icon(Icons.account_balance_wallet_outlined,
+            color: Color(0xFF00BFA5)),
+        filled: true,
+        fillColor: const Color(0xFFF6FBFA),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      hint: const Text('Sélectionner (optionnel)'),
+      items: [
+        const DropdownMenuItem<String>(
+          value: '',
+          child: Text('— Aucun —', style: TextStyle(color: Colors.grey)),
+        ),
+        ...methods.map((m) => DropdownMenuItem<String>(
+              value: m.id,
+              child: Text(m.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14)),
+            )),
+      ],
+      onChanged: (id) {
+        if (id == null || id.isEmpty) {
+          onChanged(null);
+        } else {
+          onChanged(methods.firstWhere((m) => m.id == id));
+        }
+      },
     );
   }
 }

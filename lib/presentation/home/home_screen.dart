@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -540,6 +542,27 @@ class _PaymentsChartState extends State<_PaymentsChart> {
   String _fmtShort(DateTime d) =>
       '${d.day} ${_monthLabels[d.month - 1].toLowerCase()}.';
 
+  String _fmtY(double v) {
+    if (v >= 1000000) {
+      final n = v / 1000000;
+      return '${n % 1 == 0 ? n.toInt() : n.toStringAsFixed(1)}M';
+    }
+    if (v >= 1000) {
+      final n = v / 1000;
+      return '${n % 1 == 0 ? n.toInt() : n.toStringAsFixed(1)}k';
+    }
+    return v.toInt().toString();
+  }
+
+  double _niceInterval(double maxVal) {
+    if (maxVal <= 0) return 25;
+    final raw = maxVal / 4;
+    final mag = pow(10, (log(raw) / log(10)).floorToDouble()).toDouble();
+    final norm = raw / mag;
+    final factor = norm <= 1.5 ? 1.0 : norm <= 3.0 ? 2.0 : norm <= 7.0 ? 5.0 : 10.0;
+    return factor * mag;
+  }
+
   String get _chartTitle {
     final now = DateTime.now();
     switch (_period) {
@@ -624,7 +647,10 @@ class _PaymentsChartState extends State<_PaymentsChart> {
     final maxVal = data.isEmpty
         ? 0.0
         : data.map((d) => d.amount).reduce((a, b) => a > b ? a : b);
-    final effectiveMax = maxVal < 1 ? 100.0 : maxVal * 1.25;
+    final step = _niceInterval(maxVal < 1 ? 100 : maxVal);
+    final effectiveMax = maxVal < 1
+        ? 100.0
+        : step * ((maxVal / step).ceil() + 1).toDouble();
     final barWidth = data.length <= 3 ? 28.0
         : data.length <= 6  ? 22.0
         : data.length <= 12 ? 14.0
@@ -791,8 +817,25 @@ class _PaymentsChartState extends State<_PaymentsChart> {
                   ),
                   titlesData: FlTitlesData(
                     show: true,
-                    leftTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 44,
+                        interval: step,
+                        getTitlesWidget: (value, meta) {
+                          if (value == 0) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Text(
+                              _fmtY(value),
+                              style: TextStyle(
+                                  fontSize: 9, color: Colors.grey[500]),
+                              textAlign: TextAlign.right,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                     topTitles: const AxisTitles(
                         sideTitles: SideTitles(showTitles: false)),
                     rightTitles: const AxisTitles(

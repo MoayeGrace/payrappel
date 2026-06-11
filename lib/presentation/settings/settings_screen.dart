@@ -91,6 +91,20 @@ class SettingsScreen extends StatelessWidget {
             subtitle: 'Logo, coordonnées, infos bancaires',
             onTap: () => context.push('/settings/business'),
           ),
+          _SettingsTile(
+            icon: Icons.payments_outlined,
+            iconColor: const Color(0xFF00BFA5),
+            title: 'Moyens de paiement',
+            subtitle: 'Mobile money, carte, en ligne, personnalisé',
+            onTap: () => context.push('/settings/payment-methods'),
+          ),
+          _SettingsTile(
+            icon: Icons.description_outlined,
+            iconColor: const Color(0xFF7B1FA2),
+            title: 'Templates de factures',
+            subtitle: '15 modèles prédéfinis, personnalisables',
+            onTap: () => context.push('/templates'),
+          ),
 
           const SizedBox(height: 8),
 

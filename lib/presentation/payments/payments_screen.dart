@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../data/models/invoice_model.dart';
+import '../../data/models/payment_method_model.dart';
 import '../../data/models/payment_model.dart';
+import '../../providers/business_profile_provider.dart';
 import '../../providers/invoice_provider.dart';
 import '../../providers/payment_provider.dart';
 
@@ -151,13 +153,16 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
   InvoiceModel? _selectedInvoice;
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _refCtrl = TextEditingController();
   DateTime _date = DateTime.now();
   bool _saving = false;
+  PaymentMethodModel? _selectedMethod;
 
   @override
   void dispose() {
     _amountCtrl.dispose();
     _noteCtrl.dispose();
+    _refCtrl.dispose();
     super.dispose();
   }
 
@@ -198,6 +203,9 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
             amount: amount,
             note: _noteCtrl.text.trim(),
             paidAt: _date,
+            paymentMethodId: _selectedMethod?.id ?? '',
+            paymentMethodLabel: _selectedMethod?.label ?? '',
+            paymentReference: _refCtrl.text.trim(),
           );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -338,6 +346,21 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
           ),
           const SizedBox(height: 12),
 
+          // Moyen de paiement (optionnel)
+          _PaymentMethodDropdown(
+            selected: _selectedMethod,
+            onChanged: (m) => setState(() => _selectedMethod = m),
+          ),
+          const SizedBox(height: 12),
+
+          // Référence (optionnel)
+          TextField(
+            controller: _refCtrl,
+            decoration:
+                _field('Référence / ID transaction (optionnel)', Icons.tag_outlined),
+          ),
+          const SizedBox(height: 12),
+
           // Date
           InkWell(
             onTap: () async {
@@ -410,6 +433,64 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Dropdown moyen de paiement ─────────────────────────────────────────────────
+class _PaymentMethodDropdown extends StatelessWidget {
+  final PaymentMethodModel? selected;
+  final ValueChanged<PaymentMethodModel?> onChanged;
+
+  const _PaymentMethodDropdown(
+      {required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final methods = context
+        .watch<BusinessProfileProvider>()
+        .profile
+        .enabledPaymentMethods;
+
+    if (methods.isEmpty) return const SizedBox.shrink();
+
+    final selectedId =
+        methods.any((m) => m.id == selected?.id) ? selected?.id : null;
+
+    return DropdownButtonFormField<String>(
+      value: selectedId,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'Moyen de paiement (optionnel)',
+        prefixIcon: const Icon(Icons.account_balance_wallet_outlined,
+            color: Color(0xFF43A047)),
+        filled: true,
+        fillColor: const Color(0xFFF6FBFA),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      hint: const Text('Sélectionner (optionnel)'),
+      items: [
+        const DropdownMenuItem<String>(
+          value: '',
+          child: Text('— Aucun —', style: TextStyle(color: Colors.grey)),
+        ),
+        ...methods.map((m) => DropdownMenuItem<String>(
+              value: m.id,
+              child: Text(m.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14)),
+            )),
+      ],
+      onChanged: (id) {
+        if (id == null || id.isEmpty) {
+          onChanged(null);
+        } else {
+          onChanged(methods.firstWhere((m) => m.id == id));
+        }
+      },
     );
   }
 }

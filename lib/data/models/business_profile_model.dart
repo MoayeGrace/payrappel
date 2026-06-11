@@ -1,3 +1,5 @@
+import 'payment_method_model.dart';
+
 class BusinessProfileModel {
   final String companyName;
   final String ownerName;
@@ -9,6 +11,7 @@ class BusinessProfileModel {
   final String bankAccount;
   final String footerText;
   final String? logoPath;
+  final List<PaymentMethodModel> paymentMethods;
 
   const BusinessProfileModel({
     this.companyName = '',
@@ -21,10 +24,14 @@ class BusinessProfileModel {
     this.bankAccount = '',
     this.footerText = '',
     this.logoPath,
+    this.paymentMethods = const [],
   });
 
   bool get isEmpty => companyName.isEmpty && ownerName.isEmpty;
   bool get hasLogo => logoPath != null && logoPath!.isNotEmpty;
+
+  List<PaymentMethodModel> get enabledPaymentMethods =>
+      paymentMethods.where((m) => m.isEnabled).toList();
 
   BusinessProfileModel copyWith({
     String? companyName,
@@ -38,6 +45,7 @@ class BusinessProfileModel {
     String? footerText,
     String? logoPath,
     bool clearLogo = false,
+    List<PaymentMethodModel>? paymentMethods,
   }) {
     return BusinessProfileModel(
       companyName: companyName ?? this.companyName,
@@ -50,10 +58,12 @@ class BusinessProfileModel {
       bankAccount: bankAccount ?? this.bankAccount,
       footerText: footerText ?? this.footerText,
       logoPath: clearLogo ? null : (logoPath ?? this.logoPath),
+      paymentMethods: paymentMethods ?? this.paymentMethods,
     );
   }
 
   factory BusinessProfileModel.fromMap(Map<String, dynamic> map) {
+    final rawMethods = map['paymentMethods'] as List<dynamic>?;
     return BusinessProfileModel(
       companyName: map['companyName'] as String? ?? '',
       ownerName: map['ownerName'] as String? ?? '',
@@ -65,6 +75,11 @@ class BusinessProfileModel {
       bankAccount: map['bankAccount'] as String? ?? '',
       footerText: map['footerText'] as String? ?? '',
       logoPath: map['logoPath'] as String?,
+      paymentMethods: rawMethods
+              ?.map((e) =>
+                  PaymentMethodModel.fromMap(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 
@@ -80,6 +95,7 @@ class BusinessProfileModel {
       'bankAccount': bankAccount,
       'footerText': footerText,
       'logoPath': logoPath,
+      'paymentMethods': paymentMethods.map((m) => m.toMap()).toList(),
     };
   }
 }

@@ -21,6 +21,9 @@ import 'presentation/reminders/reminders_screen.dart';
 import 'presentation/export/export_screen.dart';
 import 'presentation/settings/settings_screen.dart';
 import 'presentation/settings/business_profile_screen.dart';
+import 'presentation/settings/payment_methods_screen.dart';
+import 'presentation/templates/templates_screen.dart';
+import 'presentation/templates/template_editor_screen.dart';
 import 'presentation/splash/splash_screen.dart';
 import 'presentation/onboarding/onboarding_screen.dart';
 import 'providers/client_provider.dart';
@@ -28,6 +31,7 @@ import 'providers/invoice_provider.dart';
 import 'providers/payment_provider.dart';
 import 'providers/reminder_provider.dart';
 import 'providers/business_profile_provider.dart';
+import 'providers/invoice_template_provider.dart';
 import 'providers/subscription_provider.dart';
 import 'providers/theme_provider.dart';
 
@@ -75,6 +79,19 @@ final _router = GoRouter(
       path: '/settings/business',
       builder: (_, __) => const BusinessProfileScreen(),
     ),
+    GoRoute(
+      path: '/settings/payment-methods',
+      builder: (_, __) => const PaymentMethodsScreen(),
+    ),
+    GoRoute(
+      path: '/templates',
+      builder: (_, __) => const TemplatesScreen(),
+    ),
+    GoRoute(
+      path: '/templates/edit',
+      builder: (_, state) =>
+          TemplateEditorScreen(template: state.extra as dynamic),
+    ),
     // Export
     GoRoute(path: '/export', builder: (_, __) => const ExportScreen()),
     // Factures
@@ -111,6 +128,7 @@ class PayRappelApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => BusinessProfileProvider()),
+        ChangeNotifierProvider(create: (_) => InvoiceTemplateProvider()),
         ChangeNotifierProvider(create: (_) => SubscriptionProvider()),
         ChangeNotifierProvider(create: (_) => ClientProvider()),
         ChangeNotifierProvider(create: (_) => InvoiceProvider()),

@@ -7,6 +7,9 @@ class PaymentModel {
   final double amount;
   final String note;
   final DateTime paidAt;
+  final String paymentMethodId;
+  final String paymentMethodLabel;
+  final String paymentReference;
 
   const PaymentModel({
     required this.id,
@@ -17,6 +20,9 @@ class PaymentModel {
     required this.amount,
     this.note = '',
     required this.paidAt,
+    this.paymentMethodId = '',
+    this.paymentMethodLabel = '',
+    this.paymentReference = '',
   });
 
   factory PaymentModel.fromMap(Map<String, dynamic> map, String id) {
@@ -31,6 +37,9 @@ class PaymentModel {
       paidAt: DateTime.fromMillisecondsSinceEpoch(
         map['paidAt'] as int? ?? 0,
       ),
+      paymentMethodId: map['paymentMethodId'] as String? ?? '',
+      paymentMethodLabel: map['paymentMethodLabel'] as String? ?? '',
+      paymentReference: map['paymentReference'] as String? ?? '',
     );
   }
 
@@ -43,6 +52,9 @@ class PaymentModel {
       'amount': amount,
       'note': note,
       'paidAt': paidAt.millisecondsSinceEpoch,
+      'paymentMethodId': paymentMethodId,
+      'paymentMethodLabel': paymentMethodLabel,
+      'paymentReference': paymentReference,
     };
   }
 }
