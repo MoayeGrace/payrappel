@@ -185,6 +185,10 @@ class TemplatePdfService {
           ],
         ),
         pw.SizedBox(height: 18),
+        if (c.invoice.lineItems.isNotEmpty) ...[
+          _lineItemsTable(c),
+          pw.SizedBox(height: 14),
+        ],
         _amountsBlock(c),
         if (c.template.showPaymentMethods) ...[
           pw.SizedBox(height: 14),
@@ -317,6 +321,10 @@ class TemplatePdfService {
           ],
         ),
         pw.SizedBox(height: 16),
+        if (c.invoice.lineItems.isNotEmpty) ...[
+          _lineItemsTable(c),
+          pw.SizedBox(height: 14),
+        ],
         _amountsBlock(c),
         if (c.template.showPaymentMethods) ...[
           pw.SizedBox(height: 14),
@@ -445,6 +453,10 @@ class TemplatePdfService {
         pw.SizedBox(height: 16),
         pw.Divider(color: _kDivider, thickness: 0.5),
         pw.SizedBox(height: 12),
+        if (c.invoice.lineItems.isNotEmpty) ...[
+          _lineItemsTable(c),
+          pw.SizedBox(height: 14),
+        ],
         _amountsBlock(c),
         if (c.template.showPaymentMethods) ...[
           pw.SizedBox(height: 14),
@@ -580,6 +592,10 @@ class TemplatePdfService {
           ],
         ),
         pw.SizedBox(height: 16),
+        if (c.invoice.lineItems.isNotEmpty) ...[
+          _lineItemsTable(c),
+          pw.SizedBox(height: 14),
+        ],
         _amountsBlock(c),
         if (c.template.showPaymentMethods) ...[
           pw.SizedBox(height: 14),
@@ -791,6 +807,71 @@ class TemplatePdfService {
           _miniRow('Échéance', _fmtDate(c.invoice.dueDate)),
         ],
       ),
+    );
+  }
+
+  static pw.Widget _lineItemsTable(_RenderCtx c) {
+    final t = c.template;
+    final items = c.invoice.lineItems;
+
+    final colWidths = <int, pw.TableColumnWidth>{};
+    int col = 0;
+    colWidths[col++] = const pw.FlexColumnWidth(3);
+    if (t.tableShowQty) colWidths[col++] = const pw.FlexColumnWidth(1);
+    if (t.tableShowUnitPrice) colWidths[col++] = const pw.FlexColumnWidth(2);
+    colWidths[col] = const pw.FlexColumnWidth(2);
+
+    final headerCells = <pw.Widget>[
+      _tCell(t.tableDescLabel, header: true, textColor: PdfColors.white),
+    ];
+    if (t.tableShowQty) {
+      headerCells.add(_tCell(t.tableQtyLabel, header: true, textColor: PdfColors.white));
+    }
+    if (t.tableShowUnitPrice) {
+      headerCells.add(_tCell(t.tablePriceLabel, header: true, textColor: PdfColors.white));
+    }
+    headerCells.add(_tCell(t.tableTotalLabel, header: true, textColor: PdfColors.white));
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('PRESTATIONS',
+            style: pw.TextStyle(
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+                color: _kTextGrey,
+                letterSpacing: 1)),
+        pw.SizedBox(height: 6),
+        pw.Table(
+          border: pw.TableBorder.all(color: _kDivider, width: 0.5),
+          columnWidths: colWidths,
+          children: [
+            pw.TableRow(
+              decoration: pw.BoxDecoration(color: c.accent),
+              children: headerCells,
+            ),
+            ...items.map((item) {
+              final cells = <pw.Widget>[
+                _tCell(item['description']?.toString() ?? ''),
+              ];
+              if (t.tableShowQty) {
+                cells.add(_tCell(item['qty']?.toString() ?? ''));
+              }
+              if (t.tableShowUnitPrice) {
+                final up = item['unitPrice'];
+                cells.add(_tCell(up != null
+                    ? CurrencyFormatter.format((up as num).toDouble())
+                    : ''));
+              }
+              final total = item['total'];
+              cells.add(_tCell(total != null
+                  ? CurrencyFormatter.format((total as num).toDouble())
+                  : ''));
+              return pw.TableRow(children: cells);
+            }),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1071,14 +1152,15 @@ class TemplatePdfService {
         .toList();
   }
 
-  static pw.Widget _tCell(String text, {bool header = false}) => pw.Padding(
+  static pw.Widget _tCell(String text,
+          {bool header = false, PdfColor? textColor}) =>
+      pw.Padding(
         padding: const pw.EdgeInsets.all(5),
         child: pw.Text(text,
             style: pw.TextStyle(
               fontSize: 9,
-              fontWeight:
-                  header ? pw.FontWeight.bold : pw.FontWeight.normal,
-              color: header ? _kTextDark : _kTextGrey,
+              fontWeight: header ? pw.FontWeight.bold : pw.FontWeight.normal,
+              color: textColor ?? (header ? _kTextDark : _kTextGrey),
             )),
       );
 

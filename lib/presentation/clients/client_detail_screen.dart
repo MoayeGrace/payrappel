@@ -93,9 +93,6 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     final client = _client!;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F7FA),
-
-      // 🔵 AppBar premium
       appBar: AppBar(
         elevation: 0,
         backgroundColor: const Color(0xFF1E88E5),
@@ -228,7 +225,7 @@ class _InvoiceSummaryTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -334,18 +331,20 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 10),
-          Expanded(child: Text(text)),
-        ],
+    return Builder(
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 10),
+            Expanded(child: Text(text)),
+          ],
+        ),
       ),
     );
   }

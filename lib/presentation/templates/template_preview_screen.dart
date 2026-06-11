@@ -1,6 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../data/models/business_profile_model.dart';
 import '../../data/models/invoice_template_model.dart';
+import '../../providers/business_profile_provider.dart';
+
+// ── Preview profile data ──────────────────────────────────────────────────────
+
+class PreviewProfile {
+  final String companyName;
+  final String address;
+  final String phone;
+  final String email;
+
+  const PreviewProfile({
+    required this.companyName,
+    required this.address,
+    required this.phone,
+    required this.email,
+  });
+
+  factory PreviewProfile.from(BusinessProfileModel p) => PreviewProfile(
+        companyName: p.companyName.isEmpty ? 'Mon Entreprise' : p.companyName,
+        address: p.address.isEmpty ? 'Abidjan, Plateau' : p.address,
+        phone: p.phone.isEmpty ? '+225 07 00 00 00' : p.phone,
+        email: p.email.isEmpty ? 'contact@entreprise.com' : p.email,
+      );
+
+  static const demo = PreviewProfile(
+    companyName: 'Mon Entreprise',
+    address: 'Abidjan, Plateau',
+    phone: '+225 07 00 00 00',
+    email: 'contact@entreprise.com',
+  );
+}
+
+// ── Screen ────────────────────────────────────────────────────────────────────
 
 class TemplatePreviewScreen extends StatelessWidget {
   final InvoiceTemplateModel template;
@@ -79,10 +114,13 @@ class TemplatePreviewScreen extends StatelessWidget {
                 child: Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  child: _InvoiceDocPreview(
-                    template: template,
-                    accent: accent,
-                    headerBg: headerBg,
+                  child: Consumer<BusinessProfileProvider>(
+                    builder: (_, prov, __) => InvoiceDocPreview(
+                      template: template,
+                      accent: accent,
+                      headerBg: headerBg,
+                      profile: PreviewProfile.from(prov.profile),
+                    ),
                   ),
                 ),
               ),
@@ -162,31 +200,36 @@ class _LayoutChip extends StatelessWidget {
 
 // ── Document preview ──────────────────────────────────────────────────────────
 
-class _InvoiceDocPreview extends StatelessWidget {
+class InvoiceDocPreview extends StatelessWidget {
   final InvoiceTemplateModel template;
   final Color accent;
   final Color headerBg;
+  final PreviewProfile profile;
+  final double elevation;
 
-  const _InvoiceDocPreview({
+  const InvoiceDocPreview({
+    super.key,
     required this.template,
     required this.accent,
     required this.headerBg,
+    required this.profile,
+    this.elevation = 6,
   });
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      elevation: 6,
+      elevation: elevation,
       borderRadius: BorderRadius.circular(4),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: switch (template.layout) {
-          TemplateLayout.classic => _ClassicDoc(accent: accent),
+          TemplateLayout.classic => _ClassicDoc(accent: accent, profile: profile),
           TemplateLayout.modern =>
-            _ModernDoc(accent: accent, headerBg: headerBg),
-          TemplateLayout.minimal => _MinimalDoc(accent: accent),
+            _ModernDoc(accent: accent, headerBg: headerBg, profile: profile),
+          TemplateLayout.minimal => _MinimalDoc(accent: accent, profile: profile),
           TemplateLayout.bold =>
-            _BoldDoc(accent: accent, headerBg: headerBg, template: template),
+            _BoldDoc(accent: accent, headerBg: headerBg, template: template, profile: profile),
         },
       ),
     );
@@ -197,7 +240,8 @@ class _InvoiceDocPreview extends StatelessWidget {
 
 class _ClassicDoc extends StatelessWidget {
   final Color accent;
-  const _ClassicDoc({required this.accent});
+  final PreviewProfile profile;
+  const _ClassicDoc({required this.accent, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -229,10 +273,10 @@ class _ClassicDoc extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _bold('Mon Entreprise', size: 13),
-                          _grey('Abidjan, Plateau'),
-                          _grey('+225 07 00 00 00'),
-                          _grey('contact@entreprise.com'),
+                          _bold(profile.companyName, size: 13),
+                          if (profile.address.isNotEmpty) _grey(profile.address),
+                          if (profile.phone.isNotEmpty) _grey(profile.phone),
+                          if (profile.email.isNotEmpty) _grey(profile.email),
                         ],
                       ),
                     ),
@@ -278,8 +322,11 @@ class _ClassicDoc extends StatelessWidget {
                 Expanded(
                   child: _partyBox(
                     title: 'ÉMETTEUR',
-                    name: 'Mon Entreprise',
-                    lines: const ['Abidjan, Plateau', '+225 07 00 00 00'],
+                    name: profile.companyName,
+                    lines: [
+                      if (profile.address.isNotEmpty) profile.address,
+                      if (profile.phone.isNotEmpty) profile.phone,
+                    ],
                     bg: accent.withOpacity(0.07),
                   ),
                 ),
@@ -312,7 +359,8 @@ class _ClassicDoc extends StatelessWidget {
 class _ModernDoc extends StatelessWidget {
   final Color accent;
   final Color headerBg;
-  const _ModernDoc({required this.accent, required this.headerBg});
+  final PreviewProfile profile;
+  const _ModernDoc({required this.accent, required this.headerBg, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -341,19 +389,21 @@ class _ModernDoc extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Mon Entreprise',
+                    Text(profile.companyName,
                         style: TextStyle(
                             color: textOnHeader,
                             fontSize: 14,
                             fontWeight: FontWeight.bold)),
-                    Text('Abidjan, Plateau',
-                        style: TextStyle(
-                            color: textOnHeader.withOpacity(0.7),
-                            fontSize: 9)),
-                    Text('+225 07 00 00 00',
-                        style: TextStyle(
-                            color: textOnHeader.withOpacity(0.7),
-                            fontSize: 9)),
+                    if (profile.address.isNotEmpty)
+                      Text(profile.address,
+                          style: TextStyle(
+                              color: textOnHeader.withOpacity(0.7),
+                              fontSize: 9)),
+                    if (profile.phone.isNotEmpty)
+                      Text(profile.phone,
+                          style: TextStyle(
+                              color: textOnHeader.withOpacity(0.7),
+                              fontSize: 9)),
                   ],
                 ),
               ),
@@ -417,7 +467,8 @@ class _ModernDoc extends StatelessWidget {
 
 class _MinimalDoc extends StatelessWidget {
   final Color accent;
-  const _MinimalDoc({required this.accent});
+  final PreviewProfile profile;
+  const _MinimalDoc({required this.accent, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -434,9 +485,9 @@ class _MinimalDoc extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _bold('Mon Entreprise', size: 14),
-                    _grey('+225 07 00 00 00'),
-                    _grey('contact@entreprise.com'),
+                    _bold(profile.companyName, size: 14),
+                    if (profile.phone.isNotEmpty) _grey(profile.phone),
+                    if (profile.email.isNotEmpty) _grey(profile.email),
                   ],
                 ),
               ),
@@ -506,10 +557,12 @@ class _BoldDoc extends StatelessWidget {
   final Color accent;
   final Color headerBg;
   final InvoiceTemplateModel template;
+  final PreviewProfile profile;
   const _BoldDoc(
       {required this.accent,
       required this.headerBg,
-      required this.template});
+      required this.template,
+      required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -586,8 +639,11 @@ class _BoldDoc extends StatelessWidget {
                     Expanded(
                       child: _partyBox(
                         title: 'ÉMETTEUR',
-                        name: 'Mon Entreprise',
-                        lines: const ['Abidjan, Plateau', '+225 07 00 00 00'],
+                        name: profile.companyName,
+                        lines: [
+                          if (profile.address.isNotEmpty) profile.address,
+                          if (profile.phone.isNotEmpty) profile.phone,
+                        ],
                         bg: accent.withOpacity(0.07),
                       ),
                     ),

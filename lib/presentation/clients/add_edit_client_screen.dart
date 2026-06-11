@@ -95,15 +95,20 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
   }
 
   InputDecoration _inputDecoration(String label, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon, color: const Color(0xFF00C6A2)),
       filled: true,
-      fillColor: const Color(0xFFF6FBFA),
+      fillColor: isDark
+          ? Theme.of(context).colorScheme.surfaceContainerHighest
+          : const Color(0xFFF6FBFA),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE6F2F0)),
+        borderSide: BorderSide(
+          color: isDark ? Colors.transparent : const Color(0xFFE6F2F0),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -154,8 +159,6 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F7F9),
-
       appBar: AppBar(
         elevation: 0,
         backgroundColor: const Color(0xFF1E88E5),

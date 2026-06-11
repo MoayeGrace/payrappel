@@ -48,7 +48,10 @@ final _router = GoRouter(
 
     final isOnAuth = loc == '/login' || loc == '/register';
     if (!isLoggedIn && !isOnAuth) return '/login';
-    if (isLoggedIn && isOnAuth) return '/home';
+    // Anonymous (guest) users are logged-in but must be able to reach /register
+    // to convert their account — don't redirect them away.
+    final isAnonymous = user?.isAnonymous == true;
+    if (isLoggedIn && !isAnonymous && isOnAuth) return '/home';
     return null;
   },
   routes: [

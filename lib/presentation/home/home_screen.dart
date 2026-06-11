@@ -300,7 +300,7 @@ class _GuestBanner extends StatelessWidget {
           const SizedBox(width: 8),
           const Expanded(
             child: Text(
-              "Mode invité — créez un compte pour sauvegarder vos données.",
+              "Mode invité , créez un compte pour sauvegarder vos données.",
               style: TextStyle(fontSize: 12),
             ),
           ),

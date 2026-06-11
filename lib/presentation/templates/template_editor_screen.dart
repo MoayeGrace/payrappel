@@ -5,7 +5,7 @@ import '../../data/models/invoice_template_model.dart';
 import '../../data/models/payment_method_model.dart';
 import '../../providers/business_profile_provider.dart';
 import '../../providers/invoice_template_provider.dart';
-import 'template_preview_widget.dart';
+import 'template_preview_screen.dart';
 
 class TemplateEditorScreen extends StatefulWidget {
   final InvoiceTemplateModel template;
@@ -923,56 +923,74 @@ class _LivePreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        height: 190,
-        child: AspectRatio(
-          aspectRatio: 0.72,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.14),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6)),
-              ],
-            ),
-            clipBehavior: Clip.hardEdge,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                TemplateMiniPreview(template: template),
-                if (onTapSection != null)
-                  Positioned.fill(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          height: 55,
-                          child: _TapZone(
-                            label: 'En-tête',
-                            labelAlign: Alignment.topRight,
-                            onTap: () => onTapSection!(TemplateSectionId.topCenter),
-                          ),
-                        ),
-                        const Spacer(),
-                        SizedBox(
-                          height: 35,
-                          child: _TapZone(
-                            label: 'Pied de page',
-                            labelAlign: Alignment.bottomRight,
-                            onTap: () => onTapSection!(TemplateSectionId.bottomCenter),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
+    final accent = Color(template.accentColor);
+    final headerBg =
+        template.headerBgColor != null ? Color(template.headerBgColor!) : accent;
+
+    return Consumer<BusinessProfileProvider>(
+      builder: (_, prov, __) {
+        final profile = PreviewProfile.from(prov.profile);
+        return Container(
+          height: 220,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.14),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6)),
+            ],
           ),
-        ),
-      ),
+          clipBehavior: Clip.hardEdge,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              FittedBox(
+                fit: BoxFit.contain,
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  width: 320,
+                  child: InvoiceDocPreview(
+                    template: template,
+                    accent: accent,
+                    headerBg: headerBg,
+                    profile: profile,
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              if (onTapSection != null)
+                Positioned.fill(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        height: 80,
+                        child: _TapZone(
+                          label: 'En-tête',
+                          labelAlign: Alignment.topRight,
+                          onTap: () =>
+                              onTapSection!(TemplateSectionId.topCenter),
+                        ),
+                      ),
+                      const Spacer(),
+                      SizedBox(
+                        height: 44,
+                        child: _TapZone(
+                          label: 'Pied de page',
+                          labelAlign: Alignment.bottomRight,
+                          onTap: () =>
+                              onTapSection!(TemplateSectionId.bottomCenter),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
