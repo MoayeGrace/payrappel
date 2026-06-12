@@ -19,6 +19,9 @@ class InvoiceProvider extends ChangeNotifier {
     required double totalAmount,
     required DateTime dueDate,
     List<Map<String, String>> customFields = const [],
+    List<Map<String, dynamic>> lineItems = const [],
+    double discountAmount = 0,
+    double? globalPrice,
   }) =>
       _repo.addInvoice(
         clientId: clientId,
@@ -27,6 +30,9 @@ class InvoiceProvider extends ChangeNotifier {
         totalAmount: totalAmount,
         dueDate: dueDate,
         customFields: customFields,
+        lineItems: lineItems,
+        discountAmount: discountAmount,
+        globalPrice: globalPrice,
       );
 
   Future<void> updateInvoice(InvoiceModel invoice) =>

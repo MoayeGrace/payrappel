@@ -10,6 +10,18 @@ import '../../providers/business_profile_provider.dart';
 import '../../providers/invoice_provider.dart';
 import '../../providers/payment_provider.dart';
 
+void _showPaymentDetail(BuildContext context, PaymentModel payment) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (_) => _PaymentDetailSheet(payment: payment),
+  );
+}
+
 class PaymentsScreen extends StatelessWidget {
   const PaymentsScreen({super.key});
 
@@ -596,7 +608,7 @@ class _PaymentTile extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => context.push('/invoices/${payment.invoiceId}'),
+        onTap: () => _showPaymentDetail(context, payment),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
@@ -658,6 +670,151 @@ class _PaymentTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Détail d'un paiement ───────────────────────────────────────────────────────
+
+class _PaymentDetailSheet extends StatelessWidget {
+  final PaymentModel payment;
+  const _PaymentDetailSheet({required this.payment});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // En-tête
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF43A047).withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_circle_outline,
+                      color: Color(0xFF43A047), size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        CurrencyFormatter.format(payment.amount),
+                        style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF43A047)),
+                      ),
+                      Text(
+                        DateFormatter.format(payment.paidAt),
+                        style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Divider(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+            const SizedBox(height: 12),
+
+            // Infos
+            _InfoRow(
+              icon: Icons.receipt_long_outlined,
+              label: 'Facture',
+              value: payment.invoiceTitle.isNotEmpty
+                  ? payment.invoiceTitle
+                  : 'Sans titre',
+            ),
+            if (payment.paymentMethodLabel.isNotEmpty)
+              _InfoRow(
+                icon: Icons.account_balance_wallet_outlined,
+                label: 'Moyen de paiement',
+                value: payment.paymentMethodLabel,
+              ),
+            if (payment.paymentReference.isNotEmpty)
+              _InfoRow(
+                icon: Icons.tag_outlined,
+                label: 'Référence',
+                value: payment.paymentReference,
+              ),
+            if (payment.note.isNotEmpty)
+              _InfoRow(
+                icon: Icons.note_outlined,
+                label: 'Note',
+                value: payment.note,
+              ),
+
+            const SizedBox(height: 20),
+
+            // Bouton voir la facture
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push('/invoices/${payment.invoiceId}');
+                },
+                icon: const Icon(Icons.open_in_new, size: 16),
+                label: const Text('Voir la facture complète'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF1A73E8),
+                  side: const BorderSide(color: Color(0xFF1A73E8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoRow(
+      {required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[500]),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                Text(value,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

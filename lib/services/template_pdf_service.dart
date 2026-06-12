@@ -87,70 +87,84 @@ class TemplatePdfService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        // Optional top-center banner
         if (!c.template.topCenter.isEmpty) ...[
           _renderSection(c.template.topCenter, c, fullWidth: true),
           pw.SizedBox(height: 10),
         ],
-        // Header row: company left | title badge + meta right
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Expanded(
-              child: pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.center,
-                children: [
-                  if (c.logo != null) ...[
-                    pw.Container(
-                      width: 56,
-                      height: 56,
-                      decoration: pw.BoxDecoration(
-                          borderRadius: pw.BorderRadius.circular(8)),
-                      child: pw.Image(c.logo!, fit: pw.BoxFit.contain),
+        // ── En-tête : fond accent léger + badge + numéro de facture ──────────
+        pw.Container(
+          padding: const pw.EdgeInsets.all(14),
+          decoration: pw.BoxDecoration(
+            color: PdfColor(c.accent.red, c.accent.green, c.accent.blue, 0.07),
+            borderRadius: pw.BorderRadius.circular(6),
+          ),
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Gauche : logo + société
+              pw.Expanded(
+                flex: 3,
+                child: pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    if (c.logo != null) ...[
+                      pw.Container(
+                        width: 52,
+                        height: 52,
+                        decoration: pw.BoxDecoration(
+                            borderRadius: pw.BorderRadius.circular(8)),
+                        child: pw.Image(c.logo!, fit: pw.BoxFit.contain),
+                      ),
+                      pw.SizedBox(width: 12),
+                    ],
+                    pw.Expanded(
+                      child: _renderSectionContent(c.template.topLeft, c,
+                          defaultColor: _kTextDark),
                     ),
-                    pw.SizedBox(width: 12),
                   ],
-                  pw.Expanded(
-                    child: _renderSectionContent(
-                        c.template.topLeft, c,
-                        defaultColor: _kTextDark),
+                ),
+              ),
+              pw.SizedBox(width: 20),
+              // Droite : badge titre + numéro + méta
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 7),
+                    decoration: pw.BoxDecoration(
+                      color: c.accent,
+                      borderRadius: pw.BorderRadius.circular(5),
+                    ),
+                    child: pw.Text(
+                      c.template.titleLabel,
+                      style: pw.TextStyle(
+                        color: PdfColors.white,
+                        fontSize: 14,
+                        fontWeight: pw.FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
                   ),
+                  pw.SizedBox(height: 5),
+                  pw.Text(
+                    _invoiceNum(c),
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                      color: c.accent,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  _renderSectionContent(c.template.topRight, c,
+                      defaultColor: _kTextGrey),
+                  ..._statusBadge(c),
                 ],
               ),
-            ),
-            pw.SizedBox(width: 16),
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.end,
-              children: [
-                pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
-                  decoration: pw.BoxDecoration(
-                    color: c.accent,
-                    borderRadius: pw.BorderRadius.circular(6),
-                  ),
-                  child: pw.Text(
-                    c.template.titleLabel,
-                    style: pw.TextStyle(
-                      color: PdfColors.white,
-                      fontSize: 15,
-                      fontWeight: pw.FontWeight.bold,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ),
-                pw.SizedBox(height: 8),
-                _renderSectionContent(c.template.topRight, c,
-                    defaultColor: _kTextGrey),
-                ..._statusBadge(c),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
-        pw.SizedBox(height: 18),
-        pw.Divider(color: _kDivider, thickness: 0.5),
-        pw.SizedBox(height: 14),
-        // Parties row
+        pw.SizedBox(height: 16),
         pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
@@ -163,30 +177,29 @@ class TemplatePdfService {
                   _val(FieldSource.companyPhone, c),
                   _val(FieldSource.companyEmail, c),
                 ],
-                bgColor: PdfColor(
-                    c.accent.red, c.accent.green, c.accent.blue, 0.08),
+                bgColor:
+                    PdfColor(c.accent.red, c.accent.green, c.accent.blue, 0.08),
               ),
             ),
-            pw.SizedBox(width: 12),
+            pw.SizedBox(width: 10),
             pw.Expanded(
               child: _partyBox(
                 title: 'CLIENT',
                 name: c.invoice.clientName,
-                lines: [
-                  c.clientAddress,
-                  c.clientPhone,
-                  c.clientEmail,
-                ],
+                lines: [c.clientAddress, c.clientPhone, c.clientEmail],
                 bgColor: const PdfColor.fromInt(0xFFF8F9FA),
               ),
             ),
-            pw.SizedBox(width: 12),
+            pw.SizedBox(width: 10),
             pw.Expanded(child: _infoBox(c)),
           ],
         ),
         pw.SizedBox(height: 18),
         if (c.invoice.lineItems.isNotEmpty) ...[
-          _lineItemsTable(c),
+          _invoiceLineItemsBlock(c),
+          pw.SizedBox(height: 14),
+        ] else if (_showCustomTable(c)) ...[
+          _customTableBlock(c),
           pw.SizedBox(height: 14),
         ],
         _amountsBlock(c),
@@ -283,6 +296,14 @@ class TemplatePdfService {
                   ),
                   pw.SizedBox(height: 4),
                   pw.Text(
+                    _invoiceNum(c),
+                    style: pw.TextStyle(
+                        color: PdfColors.white,
+                        fontSize: 10,
+                        fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
                     c.invoice.title,
                     style: const pw.TextStyle(
                         color: PdfColor(1, 1, 1, 0.7), fontSize: 11),
@@ -322,7 +343,10 @@ class TemplatePdfService {
         ),
         pw.SizedBox(height: 16),
         if (c.invoice.lineItems.isNotEmpty) ...[
-          _lineItemsTable(c),
+          _invoiceLineItemsBlock(c),
+          pw.SizedBox(height: 14),
+        ] else if (_showCustomTable(c)) ...[
+          _customTableBlock(c),
           pw.SizedBox(height: 14),
         ],
         _amountsBlock(c),
@@ -413,6 +437,12 @@ class TemplatePdfService {
                           fontSize: 13,
                           fontWeight: pw.FontWeight.bold,
                           color: _kTextDark)),
+                  pw.SizedBox(height: 2),
+                  pw.Text(_invoiceNum(c),
+                      style: pw.TextStyle(
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                          color: c.accent)),
                   pw.SizedBox(height: 4),
                   _miniRow('Émise', _fmtDate(c.invoice.createdAt)),
                   _miniRow('Échéance', _fmtDate(c.invoice.dueDate)),
@@ -454,7 +484,10 @@ class TemplatePdfService {
         pw.Divider(color: _kDivider, thickness: 0.5),
         pw.SizedBox(height: 12),
         if (c.invoice.lineItems.isNotEmpty) ...[
-          _lineItemsTable(c),
+          _invoiceLineItemsBlock(c),
+          pw.SizedBox(height: 14),
+        ] else if (_showCustomTable(c)) ...[
+          _customTableBlock(c),
           pw.SizedBox(height: 14),
         ],
         _amountsBlock(c),
@@ -541,6 +574,14 @@ class TemplatePdfService {
                     ),
                   pw.SizedBox(height: 4),
                   pw.Text(
+                    _invoiceNum(c),
+                    style: pw.TextStyle(
+                        color: PdfColors.white,
+                        fontSize: 10,
+                        fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
                     'Émis le ${_fmtDate(c.invoice.createdAt)}',
                     style: const pw.TextStyle(
                         color: PdfColor(1, 1, 1, 0.7), fontSize: 9),
@@ -593,7 +634,10 @@ class TemplatePdfService {
         ),
         pw.SizedBox(height: 16),
         if (c.invoice.lineItems.isNotEmpty) ...[
-          _lineItemsTable(c),
+          _invoiceLineItemsBlock(c),
+          pw.SizedBox(height: 14),
+        ] else if (_showCustomTable(c)) ...[
+          _customTableBlock(c),
           pw.SizedBox(height: 14),
         ],
         _amountsBlock(c),
@@ -647,29 +691,32 @@ class TemplatePdfService {
         : section.alignment == 'right'
             ? pw.CrossAxisAlignment.end
             : pw.CrossAxisAlignment.start;
+    final bgColor =
+        section.backgroundColor != null ? _c(section.backgroundColor!) : null;
+    final onBg = bgColor != null && _isDark(bgColor) ? PdfColors.white : null;
     final col = pw.Column(
       crossAxisAlignment: align,
       children: section.fields.map((f) {
         final text = _resolveField(f, c);
         if (text.isEmpty) return pw.SizedBox();
         final label = f.label;
+        final fgColor =
+            f.textColor != null ? _c(f.textColor!) : (onBg ?? _kTextDark);
         return pw.Padding(
           padding: const pw.EdgeInsets.only(bottom: 1),
           child: label != null
               ? pw.Row(
                   children: [
                     pw.Text('$label : ',
-                        style:
-                            const pw.TextStyle(fontSize: 9, color: _kTextGrey)),
+                        style: pw.TextStyle(
+                            fontSize: 9, color: onBg ?? _kTextGrey)),
                     pw.Text(text,
                         style: pw.TextStyle(
                           fontSize: f.large ? 13 : 9,
                           fontWeight: f.bold
                               ? pw.FontWeight.bold
                               : pw.FontWeight.normal,
-                          color: f.textColor != null
-                              ? _c(f.textColor!)
-                              : _kTextDark,
+                          color: fgColor,
                         )),
                   ],
                 )
@@ -679,13 +726,23 @@ class TemplatePdfService {
                     fontSize: f.large ? 14 : 9,
                     fontWeight:
                         f.bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-                    color:
-                        f.textColor != null ? _c(f.textColor!) : _kTextDark,
+                    color: fgColor,
                   ),
                 ),
         );
       }).toList(),
     );
+    if (bgColor != null) {
+      return pw.Container(
+        width: fullWidth ? double.infinity : null,
+        padding: const pw.EdgeInsets.all(8),
+        decoration: pw.BoxDecoration(
+          color: bgColor,
+          borderRadius: pw.BorderRadius.circular(4),
+        ),
+        child: col,
+      );
+    }
     return fullWidth ? pw.SizedBox(width: double.infinity, child: col) : col;
   }
 
@@ -803,6 +860,12 @@ class TemplatePdfService {
                   fontWeight: pw.FontWeight.bold,
                   color: _kTextDark)),
           pw.SizedBox(height: 3),
+          pw.Text(_invoiceNum(c),
+              style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: c.accent)),
+          pw.SizedBox(height: 3),
           _miniRow('Émise', _fmtDate(c.invoice.createdAt)),
           _miniRow('Échéance', _fmtDate(c.invoice.dueDate)),
         ],
@@ -810,27 +873,55 @@ class TemplatePdfService {
     );
   }
 
-  static pw.Widget _lineItemsTable(_RenderCtx c) {
-    final t = c.template;
+  static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
     final items = c.invoice.lineItems;
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('PRESTATIONS',
+            style: pw.TextStyle(
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+                color: _kTextGrey,
+                letterSpacing: 1)),
+        pw.SizedBox(height: 6),
+        pw.Table(
+          border: pw.TableBorder.all(color: _kDivider, width: 0.5),
+          columnWidths: const {
+            0: pw.FlexColumnWidth(4),
+            1: pw.FlexColumnWidth(1),
+            2: pw.FlexColumnWidth(2),
+            3: pw.FlexColumnWidth(2),
+          },
+          children: [
+            pw.TableRow(
+              decoration: pw.BoxDecoration(color: c.accent),
+              children: ['Désignation', 'Qté', 'PU (FCFA)', 'Total (FCFA)']
+                  .map((h) => _tCell(h, header: true, textColor: PdfColors.white))
+                  .toList(),
+            ),
+            ...items.map((item) {
+              final qty = (item['qty'] as num? ?? 1).toInt();
+              final pu = (item['unitPrice'] as num? ?? 0).toDouble();
+              final total = qty * pu;
+              return pw.TableRow(children: [
+                _tCell(item['description'] as String? ?? ''),
+                _tCell('$qty'),
+                _tCell(CurrencyFormatter.format(pu)),
+                _tCell(CurrencyFormatter.format(total)),
+              ]);
+            }),
+          ],
+        ),
+      ],
+    );
+  }
 
-    final colWidths = <int, pw.TableColumnWidth>{};
-    int col = 0;
-    colWidths[col++] = const pw.FlexColumnWidth(3);
-    if (t.tableShowQty) colWidths[col++] = const pw.FlexColumnWidth(1);
-    if (t.tableShowUnitPrice) colWidths[col++] = const pw.FlexColumnWidth(2);
-    colWidths[col] = const pw.FlexColumnWidth(2);
-
-    final headerCells = <pw.Widget>[
-      _tCell(t.tableDescLabel, header: true, textColor: PdfColors.white),
-    ];
-    if (t.tableShowQty) {
-      headerCells.add(_tCell(t.tableQtyLabel, header: true, textColor: PdfColors.white));
-    }
-    if (t.tableShowUnitPrice) {
-      headerCells.add(_tCell(t.tablePriceLabel, header: true, textColor: PdfColors.white));
-    }
-    headerCells.add(_tCell(t.tableTotalLabel, header: true, textColor: PdfColors.white));
+  static pw.Widget _customTableBlock(_RenderCtx c) {
+    final table = c.template.customTable;
+    final colWidths = <int, pw.TableColumnWidth>{
+      for (var i = 0; i < table.columnCount; i++) i: const pw.FlexColumnWidth(1),
+    };
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -848,27 +939,13 @@ class TemplatePdfService {
           children: [
             pw.TableRow(
               decoration: pw.BoxDecoration(color: c.accent),
-              children: headerCells,
+              children: table.headers
+                  .map((h) => _tCell(h, header: true, textColor: PdfColors.white))
+                  .toList(),
             ),
-            ...items.map((item) {
-              final cells = <pw.Widget>[
-                _tCell(item['description']?.toString() ?? ''),
-              ];
-              if (t.tableShowQty) {
-                cells.add(_tCell(item['qty']?.toString() ?? ''));
-              }
-              if (t.tableShowUnitPrice) {
-                final up = item['unitPrice'];
-                cells.add(_tCell(up != null
-                    ? CurrencyFormatter.format((up as num).toDouble())
-                    : ''));
-              }
-              final total = item['total'];
-              cells.add(_tCell(total != null
-                  ? CurrencyFormatter.format((total as num).toDouble())
-                  : ''));
-              return pw.TableRow(children: cells);
-            }),
+            ...table.rows.map((row) => pw.TableRow(
+                  children: row.map((cell) => _tCell(cell)).toList(),
+                )),
           ],
         ),
       ],
@@ -877,6 +954,54 @@ class TemplatePdfService {
 
   static pw.Widget _amountsBlock(_RenderCtx c) {
     final inv = c.invoice;
+
+    if (inv.lineItems.isNotEmpty) {
+      return pw.Align(
+        alignment: pw.Alignment.centerRight,
+        child: pw.Container(
+          width: 230,
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: _kDivider, width: 0.5),
+            borderRadius: pw.BorderRadius.circular(8),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              _amountRow('Sous-total',
+                  CurrencyFormatter.format(inv.subtotal), _kTextDark),
+              if (inv.discountAmount > 0) ...[
+                pw.SizedBox(height: 4),
+                _amountRow('Réduction',
+                    '- ${CurrencyFormatter.format(inv.discountAmount)}',
+                    _kRed),
+              ],
+              pw.SizedBox(height: 6),
+              pw.Divider(color: _kDivider, thickness: 0.5),
+              pw.SizedBox(height: 4),
+              _amountRow('Total TTC',
+                  CurrencyFormatter.format(inv.totalAmount), _kTextDark,
+                  bold: true, large: true),
+              if (inv.paidAmount > 0) ...[
+                pw.SizedBox(height: 6),
+                pw.Divider(color: _kDivider, thickness: 0.5),
+                pw.SizedBox(height: 4),
+                _amountRow('Montant payé',
+                    CurrencyFormatter.format(inv.paidAmount), _kGreen),
+                pw.SizedBox(height: 4),
+                _amountRow(
+                  inv.isFullyPaid ? 'Soldé' : 'Reste à payer',
+                  CurrencyFormatter.format(inv.remainingAmount),
+                  inv.isFullyPaid ? _kGreen : _kRed,
+                  bold: true,
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
     return pw.Container(
       padding: const pw.EdgeInsets.all(14),
       decoration: pw.BoxDecoration(
@@ -902,6 +1027,24 @@ class TemplatePdfService {
               )),
         ],
       ),
+    );
+  }
+
+  static pw.Widget _amountRow(String label, String value, PdfColor color,
+      {bool bold = false, bool large = false}) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Text(label,
+            style: const pw.TextStyle(fontSize: 9, color: _kTextGrey)),
+        pw.Text(value,
+            style: pw.TextStyle(
+              fontSize: large ? 12 : 9,
+              fontWeight:
+                  bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+              color: color,
+            )),
+      ],
     );
   }
 
@@ -1133,10 +1276,25 @@ class TemplatePdfService {
           if (c.profile.bankAccount.isNotEmpty) c.profile.bankAccount,
         ];
         return parts.join(' — ');
+      case FieldSource.invoiceNumber:
+        return _invoiceNum(c);
       case FieldSource.manual:
         return field.manualValue ?? '';
     }
   }
+
+  static bool _isDark(PdfColor color) {
+    final r = color.red, g = color.green, b = color.blue;
+    final luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return luminance < 0.5;
+  }
+
+  static bool _showCustomTable(_RenderCtx c) =>
+      (c.invoice.globalPrice == null || c.invoice.globalPrice! <= 0) &&
+      c.template.customTable.rowCount > 0;
+
+  static String _invoiceNum(_RenderCtx c) =>
+      'N° FAC-${c.invoice.createdAt.year}-${c.invoice.id.substring(0, 6).toUpperCase()}';
 
   static String _val(FieldSource source, _RenderCtx c) =>
       _resolveField(TemplateFieldConfig(source: source), c);

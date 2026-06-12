@@ -50,6 +50,8 @@ class PaymentRepository {
     String paymentMethodId = '',
     String paymentMethodLabel = '',
     String paymentReference = '',
+    int quantity = 1,
+    double unitPrice = 0,
   }) async {
     final id = _uuid.v4();
     final payment = PaymentModel(
@@ -64,6 +66,8 @@ class PaymentRepository {
       paymentMethodId: paymentMethodId,
       paymentMethodLabel: paymentMethodLabel,
       paymentReference: paymentReference,
+      quantity: quantity,
+      unitPrice: unitPrice,
     );
 
     await _collection.doc(id).set(payment.toMap()).timeout(_kWriteTimeout, onTimeout: () {});

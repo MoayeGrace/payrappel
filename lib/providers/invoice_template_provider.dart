@@ -54,6 +54,7 @@ class InvoiceTemplateProvider extends ChangeNotifier {
       showLogo: saved.showLogo,
       showPaymentMethods: saved.showPaymentMethods,
       selectedPaymentMethodIds: saved.selectedPaymentMethodIds,
+      customTable: saved.customTable,
       topCenter: saved.topCenter,
       topLeft: saved.topLeft,
       topRight: saved.topRight,

@@ -8,6 +8,7 @@ class InvoiceModel {
   final String title;
   final double totalAmount;
   final double paidAmount;
+  final double discountAmount;
   final DateTime dueDate;
   final InvoiceStatus status;
   final DateTime createdAt;
@@ -16,6 +17,7 @@ class InvoiceModel {
   final String? templateId;
   final List<Map<String, dynamic>> lineItems;
   final String notes;
+  final double? globalPrice;
 
   const InvoiceModel({
     required this.id,
@@ -25,6 +27,7 @@ class InvoiceModel {
     required this.title,
     required this.totalAmount,
     this.paidAmount = 0,
+    this.discountAmount = 0,
     required this.dueDate,
     this.status = InvoiceStatus.draft,
     required this.createdAt,
@@ -33,10 +36,15 @@ class InvoiceModel {
     this.templateId,
     this.lineItems = const [],
     this.notes = '',
+    this.globalPrice,
   });
 
   double get remainingAmount => totalAmount - paidAmount;
   bool get isFullyPaid => paidAmount >= totalAmount;
+  double get subtotal => lineItems.isEmpty
+      ? totalAmount
+      : lineItems.fold(0.0, (s, item) =>
+          s + (item['qty'] as num? ?? 0) * (item['unitPrice'] as num? ?? 0));
 
   factory InvoiceModel.fromMap(Map<String, dynamic> map, String id) {
     return InvoiceModel(
@@ -47,6 +55,7 @@ class InvoiceModel {
       title: map['title'] as String? ?? '',
       totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0,
       paidAmount: (map['paidAmount'] as num?)?.toDouble() ?? 0,
+      discountAmount: (map['discountAmount'] as num?)?.toDouble() ?? 0,
       dueDate: DateTime.fromMillisecondsSinceEpoch(
         map['dueDate'] as int? ?? 0,
       ),
@@ -70,6 +79,7 @@ class InvoiceModel {
               .toList() ??
           [],
       notes: map['notes'] as String? ?? '',
+      globalPrice: (map['globalPrice'] as num?)?.toDouble(),
     );
   }
 
@@ -81,6 +91,7 @@ class InvoiceModel {
       'title': title,
       'totalAmount': totalAmount,
       'paidAmount': paidAmount,
+      if (discountAmount != 0) 'discountAmount': discountAmount,
       'dueDate': dueDate.millisecondsSinceEpoch,
       'status': status.name,
       'createdAt': createdAt.millisecondsSinceEpoch,
@@ -89,6 +100,7 @@ class InvoiceModel {
       if (templateId != null) 'templateId': templateId,
       if (lineItems.isNotEmpty) 'lineItems': lineItems,
       if (notes.isNotEmpty) 'notes': notes,
+      if (globalPrice != null && globalPrice! > 0) 'globalPrice': globalPrice,
     };
   }
 
@@ -96,6 +108,7 @@ class InvoiceModel {
     String? title,
     double? totalAmount,
     double? paidAmount,
+    double? discountAmount,
     DateTime? dueDate,
     InvoiceStatus? status,
     DateTime? updatedAt,
@@ -104,6 +117,8 @@ class InvoiceModel {
     bool clearTemplateId = false,
     List<Map<String, dynamic>>? lineItems,
     String? notes,
+    double? globalPrice,
+    bool clearGlobalPrice = false,
   }) {
     return InvoiceModel(
       id: id,
@@ -113,6 +128,7 @@ class InvoiceModel {
       title: title ?? this.title,
       totalAmount: totalAmount ?? this.totalAmount,
       paidAmount: paidAmount ?? this.paidAmount,
+      discountAmount: discountAmount ?? this.discountAmount,
       dueDate: dueDate ?? this.dueDate,
       status: status ?? this.status,
       createdAt: createdAt,
@@ -121,6 +137,7 @@ class InvoiceModel {
       templateId: clearTemplateId ? null : (templateId ?? this.templateId),
       lineItems: lineItems ?? this.lineItems,
       notes: notes ?? this.notes,
+      globalPrice: clearGlobalPrice ? null : (globalPrice ?? this.globalPrice),
     );
   }
 }

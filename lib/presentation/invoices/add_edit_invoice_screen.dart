@@ -1,26 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../data/models/client_model.dart';
 import '../../data/models/invoice_model.dart';
 import '../../providers/client_provider.dart';
 import '../../providers/invoice_provider.dart';
 
-class AddEditInvoiceScreen extends StatefulWidget {
-  final InvoiceModel? invoice;
-  final String? prefillClientId;
-  final String? prefillClientName;
+// ── Contrôleurs d'une ligne de facturation ─────────────────────────────────────
+class _LineItemCtrl {
+  final TextEditingController description;
+  final TextEditingController qty;
+  final TextEditingController unitPrice;
 
-  const AddEditInvoiceScreen({
-    super.key,
-    this.invoice,
-    this.prefillClientId,
-    this.prefillClientName,
-  });
+  _LineItemCtrl({String desc = '', int q = 1, double pu = 0})
+      : description = TextEditingController(text: desc),
+        qty = TextEditingController(text: q.toString()),
+        unitPrice = TextEditingController(
+            text: pu == 0 ? '' : pu.toStringAsFixed(0));
 
-  @override
-  State<AddEditInvoiceScreen> createState() => _AddEditInvoiceScreenState();
+  void attachListener(VoidCallback fn) {
+    description.addListener(fn);
+    qty.addListener(fn);
+    unitPrice.addListener(fn);
+  }
+
+  void dispose() {
+    description.dispose();
+    qty.dispose();
+    unitPrice.dispose();
+  }
+
+  Map<String, dynamic> toMap() => {
+        'description': description.text.trim(),
+        'qty': int.tryParse(qty.text.trim()) ?? 1,
+        'unitPrice':
+            double.tryParse(unitPrice.text.trim().replaceAll(' ', '')) ?? 0.0,
+      };
+
+  double get lineTotal {
+    final q = int.tryParse(qty.text.trim()) ?? 0;
+    final pu =
+        double.tryParse(unitPrice.text.trim().replaceAll(' ', '')) ?? 0.0;
+    return q * pu;
+  }
 }
 
 // ── Dropdown client ────────────────────────────────────────────────────────────
@@ -90,12 +114,31 @@ class _LockedClientField extends StatelessWidget {
   }
 }
 
+// ── Widget ─────────────────────────────────────────────────────────────────────
+class AddEditInvoiceScreen extends StatefulWidget {
+  final InvoiceModel? invoice;
+  final String? prefillClientId;
+  final String? prefillClientName;
+
+  const AddEditInvoiceScreen({
+    super.key,
+    this.invoice,
+    this.prefillClientId,
+    this.prefillClientName,
+  });
+
+  @override
+  State<AddEditInvoiceScreen> createState() => _AddEditInvoiceScreenState();
+}
+
 // ── State ──────────────────────────────────────────────────────────────────────
 class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleCtrl;
-  late final TextEditingController _amountCtrl;
+  late final TextEditingController _discountCtrl;
+  late final TextEditingController _globalPriceCtrl;
 
+  final List<_LineItemCtrl> _lineCtrl = [];
   String? _selectedClientId;
   String? _selectedClientName;
   DateTime _dueDate = DateTime.now().add(const Duration(days: 30));
@@ -103,32 +146,91 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
   List<Map<String, String>> _customFields = [];
 
   bool get _isEditing => widget.invoice != null;
-  bool get _clientLocked =>
-      _isEditing || widget.prefillClientId != null;
+  bool get _clientLocked => _isEditing || widget.prefillClientId != null;
+
+  double get _globalPrice =>
+      double.tryParse(_globalPriceCtrl.text.trim().replaceAll(' ', '')) ?? 0.0;
+  double get _subtotal =>
+      _globalPrice > 0 ? _globalPrice : _lineCtrl.fold(0.0, (s, c) => s + c.lineTotal);
+  double get _discountAmt =>
+      double.tryParse(_discountCtrl.text.trim().replaceAll(' ', '')) ?? 0.0;
+  double get _totalAmt =>
+      (_subtotal - _discountAmt).clamp(0.0, double.infinity);
 
   @override
   void initState() {
     super.initState();
     _titleCtrl = TextEditingController(text: widget.invoice?.title ?? '');
-    _amountCtrl = TextEditingController(
-      text: widget.invoice != null
-          ? widget.invoice!.totalAmount.toStringAsFixed(0)
-          : '',
-    );
     _selectedClientId =
         widget.invoice?.clientId ?? widget.prefillClientId;
     _selectedClientName =
         widget.invoice?.clientName ?? widget.prefillClientName;
+
     if (widget.invoice != null) {
       _dueDate = widget.invoice!.dueDate;
       _customFields = List.from(widget.invoice!.customFields);
+      final gp = widget.invoice!.globalPrice;
+      if (gp != null && gp > 0) {
+        _globalPriceCtrl =
+            TextEditingController(text: gp.toStringAsFixed(0));
+        _lineCtrl.add(_newCtrl());
+      } else {
+        _globalPriceCtrl = TextEditingController();
+        final items = widget.invoice!.lineItems;
+        if (items.isNotEmpty) {
+          for (final item in items) {
+            _lineCtrl.add(_newCtrl(
+              desc: item['description'] as String? ?? '',
+              q: (item['qty'] as num? ?? 1).toInt(),
+              pu: (item['unitPrice'] as num? ?? 0).toDouble(),
+            ));
+          }
+        } else {
+          _lineCtrl.add(_newCtrl(
+            desc: widget.invoice!.title,
+            q: 1,
+            pu: widget.invoice!.totalAmount + widget.invoice!.discountAmount,
+          ));
+        }
+      }
+      _discountCtrl = TextEditingController(
+        text: widget.invoice!.discountAmount > 0
+            ? widget.invoice!.discountAmount.toStringAsFixed(0)
+            : '',
+      );
+    } else {
+      _globalPriceCtrl = TextEditingController();
+      _lineCtrl.add(_newCtrl());
+      _discountCtrl = TextEditingController();
     }
+    _discountCtrl.addListener(_onChanged);
+    _globalPriceCtrl.addListener(_onChanged);
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
+  }
+
+  _LineItemCtrl _newCtrl({String desc = '', int q = 1, double pu = 0}) {
+    final ctrl = _LineItemCtrl(desc: desc, q: q, pu: pu);
+    ctrl.attachListener(_onChanged);
+    return ctrl;
+  }
+
+  void _removeItem(int index) {
+    final ctrl = _lineCtrl[index];
+    setState(() => _lineCtrl.removeAt(index));
+    WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.dispose());
   }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
-    _amountCtrl.dispose();
+    _discountCtrl.dispose();
+    _globalPriceCtrl.dispose();
+    for (final ctrl in _lineCtrl) {
+      ctrl.dispose();
+    }
     super.dispose();
   }
 
@@ -183,8 +285,7 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
                 Navigator.of(ctx).pop(true);
               }
             },
-            child:
-                Text(editIndex != null ? 'Enregistrer' : 'Ajouter'),
+            child: Text(editIndex != null ? 'Enregistrer' : 'Ajouter'),
           ),
         ],
       ),
@@ -205,7 +306,7 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
     }
   }
 
-  // ── Input decoration ───────────────────────────────────────────────────────
+  // ── Decoration ─────────────────────────────────────────────────────────────
   InputDecoration _input(String label, IconData icon) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
@@ -235,12 +336,19 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
     if (picked != null) setState(() => _dueDate = picked);
   }
 
+  // ── Soumission ─────────────────────────────────────────────────────────────
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedClientId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez sélectionner un client')),
+      );
+      return;
+    }
+    if (_totalAmt <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Veuillez sélectionner un client')),
+            content: Text('Le montant total doit être supérieur à 0')),
       );
       return;
     }
@@ -248,8 +356,11 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
 
     try {
       final provider = context.read<InvoiceProvider>();
-      final amount =
-          double.parse(_amountCtrl.text.trim().replaceAll(' ', ''));
+      final lineItems = _globalPrice > 0
+          ? const <Map<String, dynamic>>[]
+          : _lineCtrl.map((c) => c.toMap()).toList();
+      final discount = _discountAmt;
+      final amount = _totalAmt;
 
       if (_isEditing) {
         await provider.updateInvoice(
@@ -259,6 +370,10 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
             dueDate: _dueDate,
             updatedAt: DateTime.now(),
             customFields: _customFields,
+            lineItems: lineItems,
+            discountAmount: discount,
+            globalPrice: _globalPrice > 0 ? _globalPrice : null,
+            clearGlobalPrice: _globalPrice <= 0,
           ),
         );
         if (mounted) context.pop();
@@ -270,6 +385,9 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
           totalAmount: amount,
           dueDate: _dueDate,
           customFields: _customFields,
+          lineItems: lineItems,
+          discountAmount: discount,
+          globalPrice: _globalPrice > 0 ? _globalPrice : null,
         );
         if (mounted) context.go('/invoices/${newInvoice.id}');
       }
@@ -284,6 +402,172 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  // ── Widgets lignes ─────────────────────────────────────────────────────────
+  Widget _lineHeader() {
+    const labelStyle = TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFF1E88E5));
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E88E5).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Row(
+        children: [
+          Expanded(
+              flex: 4,
+              child: Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Text('Désignation', style: labelStyle),
+              )),
+          Expanded(
+              flex: 1,
+              child: Text('Qté',
+                  style: labelStyle, textAlign: TextAlign.center)),
+          Expanded(
+              flex: 2,
+              child: Text('PU (FCFA)',
+                  style: labelStyle, textAlign: TextAlign.center)),
+          Expanded(
+              flex: 2,
+              child: Text('Total',
+                  style: labelStyle, textAlign: TextAlign.end)),
+          SizedBox(width: 28),
+        ],
+      ),
+    );
+  }
+
+  Widget _lineRow(int index, _LineItemCtrl ctrl, bool isDark) {
+    final total = ctrl.lineTotal;
+    final fill = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : const Color(0xFFF6FBFA);
+    final dec = InputDecoration(
+      isDense: true,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      filled: true,
+      fillColor: fill,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide.none,
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            flex: 4,
+            child: SizedBox(
+              height: 36,
+              child: TextField(
+                controller: ctrl.description,
+                style: const TextStyle(fontSize: 12),
+                decoration: dec.copyWith(hintText: 'Désignation...'),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            flex: 1,
+            child: SizedBox(
+              height: 36,
+              child: TextField(
+                controller: ctrl.qty,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12),
+                decoration: dec.copyWith(hintText: '1'),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            flex: 2,
+            child: SizedBox(
+              height: 36,
+              child: TextField(
+                controller: ctrl.unitPrice,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.end,
+                style: const TextStyle(fontSize: 12),
+                decoration: dec.copyWith(hintText: '0'),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            flex: 2,
+            child: Container(
+              height: 36,
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                    : const Color(0xFFF0F7FF),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                total > 0 ? CurrencyFormatter.format(total) : '—',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: total > 0
+                      ? const Color(0xFF1E88E5)
+                      : Colors.grey[400],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 24,
+            child: _lineCtrl.length > 1
+                ? GestureDetector(
+                    onTap: () => _removeItem(index),
+                    child:
+                        Icon(Icons.close, size: 16, color: Colors.red[300]),
+                  )
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _totalRow(String label, double amount, Color color,
+      {bool bold = false, bool large = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: bold ? color : Colors.grey[700],
+            fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+            fontSize: large ? 15 : 14,
+          ),
+        ),
+        Text(
+          CurrencyFormatter.format(amount),
+          style: TextStyle(
+            color: color,
+            fontWeight: bold ? FontWeight.bold : FontWeight.w600,
+            fontSize: large ? 16 : 14,
+          ),
+        ),
+      ],
+    );
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -328,30 +612,11 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
             // OBJET
             TextFormField(
               controller: _titleCtrl,
-              decoration: _input(
-                  'Objet de la facture', Icons.description_outlined),
+              decoration:
+                  _input('Objet de la facture', Icons.description_outlined),
               validator: (v) => (v == null || v.trim().isEmpty)
                   ? 'Le titre est obligatoire'
                   : null,
-            ),
-
-            const SizedBox(height: 16),
-
-            // MONTANT
-            TextFormField(
-              controller: _amountCtrl,
-              keyboardType: TextInputType.number,
-              decoration: _input('Montant (FCFA)', Icons.payments_outlined)
-                  .copyWith(suffixText: 'FCFA'),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Montant requis';
-                final parsed =
-                    double.tryParse(v.trim().replaceAll(' ', ''));
-                if (parsed == null || parsed <= 0) {
-                  return 'Montant invalide';
-                }
-                return null;
-              },
             ),
 
             const SizedBox(height: 16),
@@ -380,9 +645,159 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
               ),
             ),
 
+            const SizedBox(height: 16),
+
+            // PRIX GLOBAL (raccourci)
+            TextFormField(
+              controller: _globalPriceCtrl,
+              keyboardType: TextInputType.number,
+              decoration:
+                  _input('Prix total FCFA (optionnel)', Icons.sell_outlined),
+            ),
+
             const SizedBox(height: 20),
 
-            // ── Champs personnalisés ──────────────────────────────────────
+            // ── LIGNES DE FACTURATION ──────────────────────────────────────
+            if (_globalPrice > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00C6A2).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle_outline,
+                        color: Color(0xFF00C6A2), size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Prix global renseigné — lignes de détail non requises',
+                        style:
+                            TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.table_rows_outlined,
+                            size: 18, color: Color(0xFF1E88E5)),
+                        SizedBox(width: 8),
+                        Text(
+                          'Lignes de facturation',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _lineHeader(),
+                    ..._lineCtrl.asMap().entries.map(
+                          (e) => _lineRow(e.key, e.value, isDark),
+                        ),
+                    const SizedBox(height: 10),
+                    TextButton.icon(
+                      onPressed: () =>
+                          setState(() => _lineCtrl.add(_newCtrl())),
+                      icon: const Icon(Icons.add_circle_outline, size: 16),
+                      label: const Text('Ajouter une ligne',
+                          style: TextStyle(fontSize: 13)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF1E88E5),
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 12),
+
+            // ── TOTAUX ────────────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: surfaceColor,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                children: [
+                  _totalRow(
+                    _globalPrice > 0 ? 'Prix global' : 'Sous-total',
+                    _subtotal,
+                    Colors.grey[700]!,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          'Réduction (FCFA)',
+                          style: TextStyle(
+                              color: Colors.grey[700], fontSize: 14),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: SizedBox(
+                          height: 36,
+                          child: TextField(
+                            controller: _discountCtrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.end,
+                            style: const TextStyle(
+                                color: Colors.orange,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding:
+                                  const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
+                              hintText: '0',
+                              filled: true,
+                              fillColor: containerColor,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  _totalRow(
+                    'Total TTC',
+                    _totalAmt,
+                    const Color(0xFF1E88E5),
+                    bold: true,
+                    large: true,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── CHAMPS PERSONNALISÉS ──────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -437,7 +852,7 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Référence, numéro de bon, adresse, TVA... ajoutez des champs libres qui apparaîtront sur la facture.',
+                              'Référence, numéro de bon, adresse... ajoutez des champs libres qui apparaîtront sur la facture.',
                               style: TextStyle(
                                   fontSize: 12, color: Colors.grey[500]),
                             ),
@@ -455,11 +870,12 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E88E5).withOpacity(0.05),
+                          color:
+                              const Color(0xFF1E88E5).withOpacity(0.05),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                              color:
-                                  const Color(0xFF1E88E5).withOpacity(0.2)),
+                              color: const Color(0xFF1E88E5)
+                                  .withOpacity(0.2)),
                         ),
                         child: Row(
                           children: [
@@ -492,8 +908,7 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
                                 editIndex: i,
                               ),
                               child: const Icon(Icons.edit_outlined,
-                                  size: 16,
-                                  color: Color(0xFF1E88E5)),
+                                  size: 16, color: Color(0xFF1E88E5)),
                             ),
                             const SizedBox(width: 12),
                             GestureDetector(
@@ -538,9 +953,7 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
                             strokeWidth: 2, color: Colors.white),
                       )
                     : Text(
-                        _isEditing
-                            ? 'Enregistrer'
-                            : 'Créer la facture',
+                        _isEditing ? 'Enregistrer' : 'Créer la facture',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,

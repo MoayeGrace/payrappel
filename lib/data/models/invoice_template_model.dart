@@ -17,6 +17,7 @@ enum FieldSource {
   invoiceDueDate,
   invoiceStatus,
   bankInfo,
+  invoiceNumber,
   manual,
 }
 
@@ -36,6 +37,7 @@ extension FieldSourceLabel on FieldSource {
         FieldSource.invoiceDueDate => 'Date d\'échéance',
         FieldSource.invoiceStatus => 'Statut',
         FieldSource.bankInfo => 'Infos bancaires',
+        FieldSource.invoiceNumber => 'Numéro de facture',
         FieldSource.manual => 'Texte manuel',
       };
 }
@@ -88,6 +90,7 @@ class TemplateFieldConfig {
     bool? bold,
     bool? large,
     int? textColor,
+    bool clearTextColor = false,
   }) =>
       TemplateFieldConfig(
         source: source ?? this.source,
@@ -95,7 +98,7 @@ class TemplateFieldConfig {
         manualValue: manualValue ?? this.manualValue,
         bold: bold ?? this.bold,
         large: large ?? this.large,
-        textColor: textColor ?? this.textColor,
+        textColor: clearTextColor ? null : (textColor ?? this.textColor),
       );
 }
 
@@ -104,10 +107,12 @@ class TemplateFieldConfig {
 class TemplateSectionModel {
   final String alignment; // 'left' | 'center' | 'right'
   final List<TemplateFieldConfig> fields;
+  final int? backgroundColor; // ARGB int, null = transparent
 
   const TemplateSectionModel({
     this.alignment = 'left',
     this.fields = const [],
+    this.backgroundColor,
   });
 
   bool get isEmpty => fields.isEmpty;
@@ -120,21 +125,115 @@ class TemplateSectionModel {
                     TemplateFieldConfig.fromMap(e as Map<String, dynamic>))
                 .toList() ??
             [],
+        backgroundColor: m['backgroundColor'] as int?,
       );
 
   Map<String, dynamic> toMap() => {
         'alignment': alignment,
         'fields': fields.map((f) => f.toMap()).toList(),
+        if (backgroundColor != null) 'backgroundColor': backgroundColor,
       };
 
   TemplateSectionModel copyWith({
     String? alignment,
     List<TemplateFieldConfig>? fields,
+    int? backgroundColor,
+    bool clearBgColor = false,
   }) =>
       TemplateSectionModel(
         alignment: alignment ?? this.alignment,
         fields: fields ?? this.fields,
+        backgroundColor: clearBgColor ? null : (backgroundColor ?? this.backgroundColor),
       );
+}
+
+// ── Custom table model ─────────────────────────────────────────────────────────
+
+class TemplateCustomTable {
+  final List<String> headers;
+  final List<List<String>> rows;
+
+  const TemplateCustomTable({
+    this.headers = const ['Description', 'Qté', 'Montant'],
+    this.rows = const [
+      ['Prestation 1', '1', ''],
+      ['Prestation 2', '1', ''],
+    ],
+  });
+
+  int get columnCount => headers.length;
+  int get rowCount => rows.length;
+
+  factory TemplateCustomTable.fromMap(Map<String, dynamic> m) {
+    final h = (m['headers'] as List?)?.cast<String>() ??
+        ['Description', 'Qté', 'Montant'];
+    final rawRows = m['rows'] as List?;
+    final r = rawRows
+            ?.map((row) {
+              if (row is Map) {
+                return (row['cells'] as List?)?.cast<String>() ??
+                    List.filled(h.length, '');
+              }
+              if (row is List) return row.cast<String>();
+              return List.filled(h.length, '');
+            })
+            .toList() ??
+        [List.filled(h.length, '')];
+    return TemplateCustomTable(headers: h, rows: r);
+  }
+
+  Map<String, dynamic> toMap() => {
+        'headers': headers,
+        'rows': rows.map((r) => {'cells': r.toList()}).toList(),
+      };
+
+  TemplateCustomTable copyWith({
+    List<String>? headers,
+    List<List<String>>? rows,
+  }) =>
+      TemplateCustomTable(
+        headers: headers ?? this.headers,
+        rows: rows ?? this.rows,
+      );
+
+  TemplateCustomTable updateHeader(int col, String value) {
+    if (col >= columnCount) return this;
+    final h = List<String>.from(headers);
+    h[col] = value;
+    return copyWith(headers: h);
+  }
+
+  TemplateCustomTable updateCell(int row, int col, String value) {
+    final r = rows.map((row) => List<String>.from(row)).toList();
+    if (row < r.length && col < r[row].length) r[row][col] = value;
+    return copyWith(rows: r);
+  }
+
+  TemplateCustomTable addColumn() {
+    if (columnCount >= 6) return this;
+    return copyWith(
+      headers: [...headers, 'Col. ${columnCount + 1}'],
+      rows: rows.map((r) => [...r, '']).toList(),
+    );
+  }
+
+  TemplateCustomTable removeLastColumn() {
+    if (columnCount <= 1) return this;
+    return copyWith(
+      headers: headers.sublist(0, columnCount - 1),
+      rows: rows.map((r) => r.sublist(0, columnCount - 1)).toList(),
+    );
+  }
+
+  TemplateCustomTable addRow() {
+    if (rowCount >= 20) return this;
+    return copyWith(rows: [...rows, List.filled(columnCount, '')]);
+  }
+
+  TemplateCustomTable removeLastRow() {
+    if (rowCount <= 1) return this;
+    return copyWith(rows: rows.sublist(0, rowCount - 1));
+  }
 }
 
 // ── Template model ─────────────────────────────────────────────────────────────
@@ -156,13 +255,8 @@ class InvoiceTemplateModel {
   final TemplateSectionModel bottomLeft;
   final TemplateSectionModel bottomRight;
   final TemplateSectionModel bottomCenter;
-  // ── Table (corps de la facture) ───────────────────────────────────────────
-  final String tableDescLabel;
-  final String tableQtyLabel;
-  final String tablePriceLabel;
-  final String tableTotalLabel;
-  final bool tableShowQty;
-  final bool tableShowUnitPrice;
+  // ── Tableau personnalisé (corps de la facture) ─────────────────────────────
+  final TemplateCustomTable customTable;
 
   const InvoiceTemplateModel({
     required this.id,
@@ -181,12 +275,7 @@ class InvoiceTemplateModel {
     required this.bottomLeft,
     required this.bottomRight,
     required this.bottomCenter,
-    this.tableDescLabel = 'Description',
-    this.tableQtyLabel = 'Qté',
-    this.tablePriceLabel = 'Prix unit.',
-    this.tableTotalLabel = 'Montant',
-    this.tableShowQty = true,
-    this.tableShowUnitPrice = true,
+    this.customTable = const TemplateCustomTable(),
   });
 
   factory InvoiceTemplateModel.fromMap(Map<String, dynamic> m, String id) =>
@@ -217,12 +306,10 @@ class InvoiceTemplateModel {
             m['bottomRight'] as Map<String, dynamic>? ?? {}),
         bottomCenter: TemplateSectionModel.fromMap(
             m['bottomCenter'] as Map<String, dynamic>? ?? {}),
-        tableDescLabel: m['tableDescLabel'] as String? ?? 'Description',
-        tableQtyLabel: m['tableQtyLabel'] as String? ?? 'Qté',
-        tablePriceLabel: m['tablePriceLabel'] as String? ?? 'Prix unit.',
-        tableTotalLabel: m['tableTotalLabel'] as String? ?? 'Montant',
-        tableShowQty: m['tableShowQty'] as bool? ?? true,
-        tableShowUnitPrice: m['tableShowUnitPrice'] as bool? ?? true,
+        customTable: m['customTable'] != null
+            ? TemplateCustomTable.fromMap(
+                m['customTable'] as Map<String, dynamic>)
+            : const TemplateCustomTable(),
       );
 
   Map<String, dynamic> toMap() => {
@@ -241,12 +328,7 @@ class InvoiceTemplateModel {
         'bottomLeft': bottomLeft.toMap(),
         'bottomRight': bottomRight.toMap(),
         'bottomCenter': bottomCenter.toMap(),
-        'tableDescLabel': tableDescLabel,
-        'tableQtyLabel': tableQtyLabel,
-        'tablePriceLabel': tablePriceLabel,
-        'tableTotalLabel': tableTotalLabel,
-        'tableShowQty': tableShowQty,
-        'tableShowUnitPrice': tableShowUnitPrice,
+        'customTable': customTable.toMap(),
       };
 
   InvoiceTemplateModel copyWith({
@@ -265,12 +347,7 @@ class InvoiceTemplateModel {
     TemplateSectionModel? bottomLeft,
     TemplateSectionModel? bottomRight,
     TemplateSectionModel? bottomCenter,
-    String? tableDescLabel,
-    String? tableQtyLabel,
-    String? tablePriceLabel,
-    String? tableTotalLabel,
-    bool? tableShowQty,
-    bool? tableShowUnitPrice,
+    TemplateCustomTable? customTable,
   }) =>
       InvoiceTemplateModel(
         id: id,
@@ -290,12 +367,7 @@ class InvoiceTemplateModel {
         bottomLeft: bottomLeft ?? this.bottomLeft,
         bottomRight: bottomRight ?? this.bottomRight,
         bottomCenter: bottomCenter ?? this.bottomCenter,
-        tableDescLabel: tableDescLabel ?? this.tableDescLabel,
-        tableQtyLabel: tableQtyLabel ?? this.tableQtyLabel,
-        tablePriceLabel: tablePriceLabel ?? this.tablePriceLabel,
-        tableTotalLabel: tableTotalLabel ?? this.tableTotalLabel,
-        tableShowQty: tableShowQty ?? this.tableShowQty,
-        tableShowUnitPrice: tableShowUnitPrice ?? this.tableShowUnitPrice,
+        customTable: customTable ?? this.customTable,
       );
 }
 
@@ -315,6 +387,7 @@ const _sectionCompany = TemplateSectionModel(
 const _sectionInvoiceMeta = TemplateSectionModel(
   alignment: 'right',
   fields: [
+    TemplateFieldConfig(source: FieldSource.invoiceNumber, bold: true),
     TemplateFieldConfig(source: FieldSource.invoiceDate, label: 'Émise le'),
     TemplateFieldConfig(source: FieldSource.invoiceDueDate, label: 'Échéance'),
     TemplateFieldConfig(source: FieldSource.invoiceStatus, label: 'Statut'),

@@ -10,6 +10,8 @@ class PaymentModel {
   final String paymentMethodId;
   final String paymentMethodLabel;
   final String paymentReference;
+  final int quantity;
+  final double unitPrice;
 
   const PaymentModel({
     required this.id,
@@ -23,6 +25,8 @@ class PaymentModel {
     this.paymentMethodId = '',
     this.paymentMethodLabel = '',
     this.paymentReference = '',
+    this.quantity = 1,
+    this.unitPrice = 0,
   });
 
   factory PaymentModel.fromMap(Map<String, dynamic> map, String id) {
@@ -40,6 +44,8 @@ class PaymentModel {
       paymentMethodId: map['paymentMethodId'] as String? ?? '',
       paymentMethodLabel: map['paymentMethodLabel'] as String? ?? '',
       paymentReference: map['paymentReference'] as String? ?? '',
+      quantity: (map['quantity'] as num?)?.toInt() ?? 1,
+      unitPrice: (map['unitPrice'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -55,6 +61,8 @@ class PaymentModel {
       'paymentMethodId': paymentMethodId,
       'paymentMethodLabel': paymentMethodLabel,
       'paymentReference': paymentReference,
+      if (quantity != 1) 'quantity': quantity,
+      if (unitPrice != 0) 'unitPrice': unitPrice,
     };
   }
 }

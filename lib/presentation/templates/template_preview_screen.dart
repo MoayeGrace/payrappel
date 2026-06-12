@@ -224,10 +224,12 @@ class InvoiceDocPreview extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: switch (template.layout) {
-          TemplateLayout.classic => _ClassicDoc(accent: accent, profile: profile),
+          TemplateLayout.classic =>
+            _ClassicDoc(accent: accent, template: template, profile: profile),
           TemplateLayout.modern =>
-            _ModernDoc(accent: accent, headerBg: headerBg, profile: profile),
-          TemplateLayout.minimal => _MinimalDoc(accent: accent, profile: profile),
+            _ModernDoc(accent: accent, headerBg: headerBg, template: template, profile: profile),
+          TemplateLayout.minimal =>
+            _MinimalDoc(accent: accent, template: template, profile: profile),
           TemplateLayout.bold =>
             _BoldDoc(accent: accent, headerBg: headerBg, template: template, profile: profile),
         },
@@ -240,8 +242,9 @@ class InvoiceDocPreview extends StatelessWidget {
 
 class _ClassicDoc extends StatelessWidget {
   final Color accent;
+  final InvoiceTemplateModel template;
   final PreviewProfile profile;
-  const _ClassicDoc({required this.accent, required this.profile});
+  const _ClassicDoc({required this.accent, required this.template, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -251,69 +254,98 @@ class _ClassicDoc extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header : logo placeholder + infos société | badge FACTURE + méta
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          // ── En-tête redesigné : bordure gauche accent ─────────────────────
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(5),
+              border: Border(
+                left: BorderSide(color: accent, width: 3),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Gauche : logo + société
+                Expanded(
+                  flex: 3,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (template.showLogo) ...[
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: accent.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Icon(Icons.business, color: accent, size: 20),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: template.topLeft.isEmpty
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _bold(profile.companyName, size: 12),
+                                  if (profile.address.isNotEmpty)
+                                    _grey(profile.address),
+                                  if (profile.phone.isNotEmpty)
+                                    _grey(profile.phone),
+                                ],
+                              )
+                            : _renderSection(template.topLeft, profile,
+                                boldColor: const Color(0xFF202124),
+                                baseFontSize: 9),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Droite : badge titre + numéro + méta
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Container(
-                      width: 42,
-                      height: 42,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: accent.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(6),
+                        color: accent,
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Icon(Icons.business, color: accent, size: 22),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _bold(profile.companyName, size: 13),
-                          if (profile.address.isNotEmpty) _grey(profile.address),
-                          if (profile.phone.isNotEmpty) _grey(profile.phone),
-                          if (profile.email.isNotEmpty) _grey(profile.email),
-                        ],
+                      child: Text(
+                        template.titleLabel,
+                        style: TextStyle(
+                            color: TemplatePreviewScreen._contrastColor(accent),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2),
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'N° FAC-2026-A3B4C5',
+                      style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          color: accent),
+                    ),
+                    const SizedBox(height: 3),
+                    if (template.topRight.isEmpty) ...[
+                      _metaRow('Émise le', '01/01/2026'),
+                      _metaRow('Échéance', '31/01/2026'),
+                    ] else
+                      _renderSection(template.topRight, profile,
+                          baseFontSize: 8),
                   ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: accent,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Text(
-                      'FACTURE',
-                      style: TextStyle(
-                          color: TemplatePreviewScreen._contrastColor(accent),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  _metaRow('Émise le', '01/01/2026'),
-                  _metaRow('Échéance', '31/01/2026'),
-                  _metaRow('Statut', 'En cours'),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
-          Divider(color: Colors.grey.shade200, thickness: 0.5),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           // Parties
           IntrinsicHeight(
             child: Row(
@@ -340,14 +372,16 @@ class _ClassicDoc extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Expanded(child: _invoiceInfoBox()),
+                Expanded(child: _invoiceInfoBox(accent)),
               ],
             ),
           ),
           const SizedBox(height: 14),
+          _tablePreview(template, accent),
           _amountsBox(accent),
+          if (template.showPaymentMethods) _paymentMethodsHint(accent),
           const SizedBox(height: 14),
-          _footer(accent),
+          _footerSection(template.bottomCenter, accent, profile),
         ],
       ),
     );
@@ -359,8 +393,9 @@ class _ClassicDoc extends StatelessWidget {
 class _ModernDoc extends StatelessWidget {
   final Color accent;
   final Color headerBg;
+  final InvoiceTemplateModel template;
   final PreviewProfile profile;
-  const _ModernDoc({required this.accent, required this.headerBg, required this.profile});
+  const _ModernDoc({required this.accent, required this.headerBg, required this.template, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -374,17 +409,19 @@ class _ModernDoc extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(6),
+              if (template.showLogo) ...[
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(Icons.business,
+                      color: Colors.white.withOpacity(0.85), size: 22),
                 ),
-                child: Icon(Icons.business,
-                    color: Colors.white.withOpacity(0.85), size: 22),
-              ),
-              const SizedBox(width: 10),
+                const SizedBox(width: 10),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,13 +447,19 @@ class _ModernDoc extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('FACTURE',
+                  Text(template.titleLabel,
                       style: TextStyle(
                           color: textOnHeader,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 2)),
                   const SizedBox(height: 3),
+                  Text('N° FAC-2026-A3B4C5',
+                      style: TextStyle(
+                          color: textOnHeader,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
                   Text('Facture Janv. 2026',
                       style: TextStyle(
                           color: textOnHeader.withOpacity(0.7), fontSize: 9)),
@@ -447,14 +490,16 @@ class _ModernDoc extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(child: _invoiceInfoBox()),
+                    Expanded(child: _invoiceInfoBox(accent)),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
+              _tablePreview(template, accent),
               _amountsBox(accent),
+              if (template.showPaymentMethods) _paymentMethodsHint(accent),
               const SizedBox(height: 14),
-              _footer(accent),
+              _footerSection(template.bottomCenter, accent, profile),
             ],
           ),
         ),
@@ -467,8 +512,9 @@ class _ModernDoc extends StatelessWidget {
 
 class _MinimalDoc extends StatelessWidget {
   final Color accent;
+  final InvoiceTemplateModel template;
   final PreviewProfile profile;
-  const _MinimalDoc({required this.accent, required this.profile});
+  const _MinimalDoc({required this.accent, required this.template, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -492,7 +538,7 @@ class _MinimalDoc extends StatelessWidget {
                 ),
               ),
               Text(
-                'FACTURE',
+                template.titleLabel,
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -516,6 +562,12 @@ class _MinimalDoc extends StatelessWidget {
                       _sectionLabel('FACTURE'),
                       const SizedBox(height: 3),
                       _bold('Facture Janv. 2026', size: 11),
+                      const SizedBox(height: 2),
+                      Text('N° FAC-2026-A3B4C5',
+                          style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                              color: accent)),
                       const SizedBox(height: 4),
                       _metaRow('Émise', '01/01/2026'),
                       _metaRow('Échéance', '31/01/2026'),
@@ -542,9 +594,11 @@ class _MinimalDoc extends StatelessWidget {
           const SizedBox(height: 14),
           Divider(color: Colors.grey.shade200, thickness: 0.5),
           const SizedBox(height: 10),
+          _tablePreview(template, accent),
           _amountsBox(accent),
+          if (template.showPaymentMethods) _paymentMethodsHint(accent),
           const SizedBox(height: 14),
-          _footer(accent),
+          _footerSection(template.bottomCenter, accent, profile),
         ],
       ),
     );
@@ -609,6 +663,13 @@ class _BoldDoc extends StatelessWidget {
                           color: textOnHeader,
                           fontSize: 9,
                           fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text('N° FAC-2026-A3B4C5',
+                      style: TextStyle(
+                          color: textOnHeader,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
                   Text('Émis le 01/01/2026',
                       style: TextStyle(
                           color: textOnHeader.withOpacity(0.7), fontSize: 8)),
@@ -660,9 +721,11 @@ class _BoldDoc extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
+              _tablePreview(template, accent),
               _amountsBox(accent),
+              if (template.showPaymentMethods) _paymentMethodsHint(accent),
               const SizedBox(height: 14),
-              _footer(accent),
+              _footerSection(template.bottomCenter, accent, profile),
             ],
           ),
         ),
@@ -672,6 +735,60 @@ class _BoldDoc extends StatelessWidget {
 }
 
 // ── Shared preview widgets ────────────────────────────────────────────────────
+
+Widget _tablePreview(InvoiceTemplateModel template, Color accent) {
+  final table = template.customTable;
+  if (table.rowCount == 0 || table.columnCount == 0) return const SizedBox.shrink();
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        color: accent,
+        child: Row(
+          children: table.headers.map((h) => Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+              child: Text(h,
+                style: const TextStyle(fontSize: 7, fontWeight: FontWeight.bold, color: Colors.white),
+                overflow: TextOverflow.ellipsis),
+            ),
+          )).toList(),
+        ),
+      ),
+      ...table.rows.asMap().entries.map((e) => Container(
+        decoration: BoxDecoration(
+          color: e.key.isOdd ? Colors.grey.shade50 : Colors.white,
+          border: Border(bottom: BorderSide(color: Colors.grey.shade100, width: 0.3)),
+        ),
+        child: Row(
+          children: e.value.map((cell) => Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+              child: Text(cell,
+                style: const TextStyle(fontSize: 7, color: Color(0xFF202124)),
+                overflow: TextOverflow.ellipsis),
+            ),
+          )).toList(),
+        ),
+      )),
+      const SizedBox(height: 10),
+    ],
+  );
+}
+
+Widget _paymentMethodsHint(Color accent) {
+  return Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: Row(
+      children: [
+        Icon(Icons.payment_outlined, size: 9, color: Colors.grey.shade400),
+        const SizedBox(width: 4),
+        Text('Moyens de paiement',
+            style: TextStyle(fontSize: 7, color: Colors.grey.shade400)),
+      ],
+    ),
+  );
+}
 
 Widget _partyBox({
   required String title,
@@ -695,7 +812,7 @@ Widget _partyBox({
   );
 }
 
-Widget _invoiceInfoBox() {
+Widget _invoiceInfoBox(Color accent) {
   return Container(
     padding: const EdgeInsets.all(9),
     decoration: BoxDecoration(
@@ -706,8 +823,14 @@ Widget _invoiceInfoBox() {
       children: [
         _sectionLabel('FACTURE'),
         const SizedBox(height: 3),
-        _bold('FAC-2026-001', size: 10),
-        const SizedBox(height: 4),
+        _bold('Facture Janv. 2026', size: 10),
+        const SizedBox(height: 2),
+        Text('N° FAC-2026-A3B4C5',
+            style: TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+                color: accent)),
+        const SizedBox(height: 3),
         _metaRow('Émise', '01/01/2026'),
         _metaRow('Éch.', '31/01/2026'),
       ],
@@ -760,18 +883,134 @@ Widget _amountTile(String label, String value, Color color,
   );
 }
 
-Widget _footer(Color accent) {
+
+// ── Section rendering helpers ─────────────────────────────────────────────────
+
+CrossAxisAlignment _crossAlign(String alignment) => switch (alignment) {
+      'center' => CrossAxisAlignment.center,
+      'right' => CrossAxisAlignment.end,
+      _ => CrossAxisAlignment.start,
+    };
+
+TextAlign _textAlign(String alignment) => switch (alignment) {
+      'center' => TextAlign.center,
+      'right' => TextAlign.right,
+      _ => TextAlign.left,
+    };
+
+String _fieldValue(TemplateFieldConfig field, PreviewProfile profile) {
+  final base = switch (field.source) {
+    FieldSource.companyName => profile.companyName,
+    FieldSource.companyAddress => profile.address,
+    FieldSource.companyPhone => profile.phone,
+    FieldSource.companyEmail => profile.email,
+    FieldSource.companyRccm => 'RC/ABJ/2024/001',
+    FieldSource.clientName => 'Jean Dupont',
+    FieldSource.clientAddress => 'Abidjan, Plateau',
+    FieldSource.clientPhone => '+225 05 00 00 00',
+    FieldSource.clientEmail => 'client@email.com',
+    FieldSource.invoiceTitle => 'FAC-2026-001',
+    FieldSource.invoiceDate => '01/01/2026',
+    FieldSource.invoiceDueDate => '31/01/2026',
+    FieldSource.invoiceStatus => 'En cours',
+    FieldSource.bankInfo => 'Ma Banque — 123456789',
+    FieldSource.invoiceNumber => 'N° FAC-2026-A3B4C5',
+    FieldSource.manual => field.manualValue ?? '',
+  };
+  if (base.isEmpty) return '';
+  return field.label != null ? '${field.label} : $base' : base;
+}
+
+bool _isColorDark(Color c) {
+  final luminance =
+      0.2126 * c.red / 255 + 0.7152 * c.green / 255 + 0.0722 * c.blue / 255;
+  return luminance < 0.5;
+}
+
+Widget _renderSection(
+  TemplateSectionModel section,
+  PreviewProfile profile, {
+  Color baseColor = const Color(0xFF5F6368),
+  Color boldColor = const Color(0xFF202124),
+  double baseFontSize = 9,
+  TextOverflow overflow = TextOverflow.ellipsis,
+}) {
+  if (section.isEmpty) return const SizedBox.shrink();
+  final crossAlign = _crossAlign(section.alignment);
+  final tAlign = _textAlign(section.alignment);
+
+  Color? bgColor =
+      section.backgroundColor != null ? Color(section.backgroundColor!) : null;
+  final onDark = bgColor != null && _isColorDark(bgColor);
+  final effectiveBase = onDark ? Colors.white70 : baseColor;
+  final effectiveBold = onDark ? Colors.white : boldColor;
+
+  final col = Column(
+    crossAxisAlignment: crossAlign,
+    children: section.fields.map<Widget>((f) {
+      final text = _fieldValue(f, profile);
+      if (text.isEmpty) return const SizedBox.shrink();
+      final fg = f.textColor != null
+          ? Color(f.textColor!)
+          : (f.bold ? effectiveBold : effectiveBase);
+      return Text(
+        text,
+        textAlign: tAlign,
+        overflow: overflow,
+        style: TextStyle(
+          fontSize: f.large ? baseFontSize + 3 : baseFontSize,
+          fontWeight: f.bold ? FontWeight.bold : FontWeight.normal,
+          color: fg,
+        ),
+      );
+    }).toList(),
+  );
+
+  if (bgColor != null) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: col,
+    );
+  }
+  return col;
+}
+
+Widget _footerSection(
+    TemplateSectionModel section, Color accent, PreviewProfile profile) {
+  final tAlign = _textAlign(section.alignment);
+  final crossAlign = _crossAlign(section.alignment);
   return Column(
+    crossAxisAlignment: crossAlign,
     children: [
       Divider(color: Colors.grey.shade200, thickness: 0.5),
       const SizedBox(height: 4),
-      Text('Ma Banque — Compte 123456789',
-          style: TextStyle(fontSize: 8, color: Colors.grey.shade400),
-          textAlign: TextAlign.center),
-      const SizedBox(height: 2),
-      Text('Merci pour votre confiance.',
-          style: TextStyle(fontSize: 8, color: Colors.grey.shade400),
-          textAlign: TextAlign.center),
+      if (section.isEmpty) ...[
+        Text('Ma Banque — Compte 123456789',
+            style: TextStyle(fontSize: 8, color: Colors.grey.shade400),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 2),
+        Text('Merci pour votre confiance.',
+            style: TextStyle(fontSize: 8, color: Colors.grey.shade400),
+            textAlign: TextAlign.center),
+      ] else
+        ...section.fields.map<Widget>((f) {
+          final text = _fieldValue(f, profile);
+          if (text.isEmpty) return const SizedBox.shrink();
+          return Text(
+            text,
+            textAlign: tAlign,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: f.large ? 11 : 8,
+              fontWeight: f.bold ? FontWeight.bold : FontWeight.normal,
+              color: Colors.grey.shade500,
+            ),
+          );
+        }),
       const SizedBox(height: 2),
       Text('Document généré par PayRappel',
           style: TextStyle(fontSize: 7, color: Colors.grey.shade300),
@@ -805,14 +1044,18 @@ Widget _grey(String text) => Text(
 Widget _metaRow(String label, String value) => Padding(
       padding: const EdgeInsets.only(top: 1),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text('$label : ',
               style: const TextStyle(fontSize: 9, color: Color(0xFF9AA0A6))),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF202124))),
+          Flexible(
+            child: Text(value,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF202124))),
+          ),
         ],
       ),
     );

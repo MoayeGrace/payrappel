@@ -200,10 +200,35 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
         ],
       ),
     );
-    if (ok == true && mounted) {
-      await context.read<InvoiceProvider>().deleteInvoice(invoice.id);
-      if (mounted) context.pop();
-    }
+    if (ok != true || !mounted) return;
+
+    final title = invoice.title;
+    final invoiceId = invoice.id;
+    final invoiceProv = context.read<InvoiceProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    // Naviguer d'abord — évite le flash "Facture introuvable" du stream
+    context.go('/invoices');
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline,
+                color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text('Facture "$title" supprimée')),
+          ],
+        ),
+        backgroundColor: const Color(0xFF43A047),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+
+    await invoiceProv.deleteInvoice(invoiceId);
   }
 
   @override
@@ -379,6 +404,12 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
 
           const SizedBox(height: 16),
 
+          // ── Tableau des lignes (si présent) ───────────────────────────────
+          if (invoice.lineItems.isNotEmpty) ...[
+            _WhiteCard(child: _LineItemsTable(invoice: invoice)),
+            const SizedBox(height: 12),
+          ],
+
           // ── Résumé financier ───────────────────────────────────────────────
           _WhiteCard(
             child: Column(
@@ -389,11 +420,32 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
-                _FinancialRow(
-                  label: 'Total facturé',
-                  amount: invoice.totalAmount,
-                  color: const Color(0xFF1A73E8),
-                ),
+                if (invoice.lineItems.isNotEmpty) ...[
+                  _FinancialRow(
+                    label: 'Sous-total',
+                    amount: invoice.subtotal,
+                    color: Colors.grey.shade700,
+                  ),
+                  if (invoice.discountAmount > 0) ...[
+                    const SizedBox(height: 6),
+                    _FinancialRow(
+                      label: 'Réduction',
+                      amount: invoice.discountAmount,
+                      color: Colors.orange,
+                    ),
+                  ],
+                  const Divider(height: 20),
+                  _FinancialRow(
+                    label: 'Total TTC',
+                    amount: invoice.totalAmount,
+                    color: const Color(0xFF1A73E8),
+                  ),
+                ] else
+                  _FinancialRow(
+                    label: 'Total facturé',
+                    amount: invoice.totalAmount,
+                    color: const Color(0xFF1A73E8),
+                  ),
                 const Divider(height: 20),
                 _FinancialRow(
                   label: 'Montant payé',
@@ -509,7 +561,7 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _exportingPdf
-                          ? _ExportingIndicator(color: const Color(0xFF1A73E8))
+                          ? const _ExportingIndicator(color: Color(0xFF1A73E8))
                           : _ActionButton(
                               icon: Icons.picture_as_pdf_outlined,
                               label: 'PDF',
@@ -520,7 +572,7 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _exportingWord
-                          ? _ExportingIndicator(color: const Color(0xFF2B579A))
+                          ? const _ExportingIndicator(color: Color(0xFF2B579A))
                           : _ActionButton(
                               icon: Icons.article_outlined,
                               label: 'Word',
@@ -689,6 +741,95 @@ class _PaymentTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Tableau des lignes de facturation ─────────────────────────────────────────
+class _LineItemsTable extends StatelessWidget {
+  final InvoiceModel invoice;
+  const _LineItemsTable({required this.invoice});
+
+  @override
+  Widget build(BuildContext context) {
+    const labelStyle = TextStyle(
+        fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1A73E8));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.table_rows_outlined, size: 16, color: Color(0xFF1A73E8)),
+            SizedBox(width: 8),
+            Text('Lignes de facturation',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // En-tête
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A73E8).withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            children: [
+              Expanded(
+                  flex: 4,
+                  child: Text('Désignation', style: labelStyle)),
+              Expanded(
+                  flex: 1,
+                  child: Text('Qté',
+                      style: labelStyle, textAlign: TextAlign.center)),
+              Expanded(
+                  flex: 2,
+                  child: Text('PU',
+                      style: labelStyle, textAlign: TextAlign.end)),
+              Expanded(
+                  flex: 2,
+                  child: Text('Total',
+                      style: labelStyle, textAlign: TextAlign.end)),
+            ],
+          ),
+        ),
+        ...invoice.lineItems.map((item) {
+          final desc = item['description'] as String? ?? '';
+          final qty = (item['qty'] as num? ?? 1).toInt();
+          final pu = (item['unitPrice'] as num? ?? 0).toDouble();
+          final total = qty * pu;
+          return Padding(
+            padding:
+                const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+            child: Row(
+              children: [
+                Expanded(
+                    flex: 4,
+                    child: Text(desc,
+                        style: const TextStyle(fontSize: 13))),
+                Expanded(
+                    flex: 1,
+                    child: Text('$qty',
+                        style: const TextStyle(fontSize: 13),
+                        textAlign: TextAlign.center)),
+                Expanded(
+                    flex: 2,
+                    child: Text(CurrencyFormatter.format(pu),
+                        style: const TextStyle(fontSize: 13),
+                        textAlign: TextAlign.end)),
+                Expanded(
+                    flex: 2,
+                    child: Text(CurrencyFormatter.format(total),
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1A73E8)),
+                        textAlign: TextAlign.end)),
+              ],
+            ),
+          );
+        }),
+      ],
     );
   }
 }
@@ -991,9 +1132,27 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
   final _noteCtrl = TextEditingController();
   final _refCtrl = TextEditingController();
   final _methodNameCtrl = TextEditingController();
+  final _qtyCtrl = TextEditingController(text: '1');
+  final _puCtrl = TextEditingController();
   DateTime _date = DateTime.now();
   bool _saving = false;
   PaymentMethodModel? _selectedMethod;
+
+  @override
+  void initState() {
+    super.initState();
+    _qtyCtrl.addListener(_updateFromQtyPu);
+    _puCtrl.addListener(_updateFromQtyPu);
+  }
+
+  void _updateFromQtyPu() {
+    final qty = int.tryParse(_qtyCtrl.text.trim()) ?? 0;
+    final pu = double.tryParse(_puCtrl.text.trim().replaceAll(' ', '')) ?? 0.0;
+    if (qty > 0 && pu > 0) {
+      final total = (qty * pu).toStringAsFixed(0);
+      if (_amountCtrl.text != total) _amountCtrl.text = total;
+    }
+  }
 
   @override
   void dispose() {
@@ -1001,6 +1160,8 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
     _methodNameCtrl.dispose();
     _noteCtrl.dispose();
     _refCtrl.dispose();
+    _qtyCtrl.dispose();
+    _puCtrl.dispose();
     super.dispose();
   }
 
@@ -1011,6 +1172,8 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
           .showSnackBar(const SnackBar(content: Text('Montant invalide')));
       return;
     }
+    final qty = int.tryParse(_qtyCtrl.text.trim()) ?? 1;
+    final pu = double.tryParse(_puCtrl.text.trim().replaceAll(' ', '')) ?? 0.0;
     setState(() => _saving = true);
     try {
       await context.read<PaymentProvider>().addPayment(
@@ -1023,6 +1186,8 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
             paymentMethodId: _selectedMethod?.id ?? '',
             paymentMethodLabel: _selectedMethod?.label ?? _methodNameCtrl.text.trim(),
             paymentReference: _refCtrl.text.trim(),
+            quantity: qty,
+            unitPrice: pu,
           );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -1037,7 +1202,11 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputFill = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : const Color(0xFFF6FBFA);
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
           24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
       child: Column(
@@ -1067,6 +1236,48 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
             style: const TextStyle(color: Color(0xFFF57C00), fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 20),
+          // Qté et Prix unitaire (optionnel — calcule le montant automatiquement)
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _qtyCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Quantité',
+                    prefixIcon: const Icon(Icons.format_list_numbered,
+                        color: Color(0xFF00BFA5)),
+                    filled: true,
+                    fillColor: inputFill,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _puCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Prix unitaire',
+                    suffixText: 'FCFA',
+                    prefixIcon: const Icon(Icons.sell_outlined,
+                        color: Color(0xFF00BFA5)),
+                    filled: true,
+                    fillColor: inputFill,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _amountCtrl,
             keyboardType: TextInputType.number,
@@ -1075,7 +1286,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
               labelText: 'Montant (FCFA)',
               prefixIcon: const Icon(Icons.payments_outlined, color: Color(0xFF00BFA5)),
               filled: true,
-              fillColor: const Color(0xFFF6FBFA),
+              fillColor: inputFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -1089,7 +1300,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
               labelText: 'Note (optionnel)',
               prefixIcon: const Icon(Icons.note_outlined, color: Color(0xFF00BFA5)),
               filled: true,
-              fillColor: const Color(0xFFF6FBFA),
+              fillColor: inputFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -1111,7 +1322,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
               labelText: 'Référence / ID de transaction (optionnel)',
               prefixIcon: const Icon(Icons.tag_outlined, color: Color(0xFF00BFA5)),
               filled: true,
-              fillColor: const Color(0xFFF6FBFA),
+              fillColor: inputFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -1134,7 +1345,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFF6FBFA),
+                color: inputFill,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Row(
@@ -1211,13 +1422,13 @@ class _PaymentMethodDropdown extends StatelessWidget {
         .profile
         .enabledPaymentMethods;
 
-    const decoration = InputDecoration(
+    final decoration = InputDecoration(
       labelText: 'Moyen de paiement (optionnel)',
-      prefixIcon: Icon(Icons.account_balance_wallet_outlined,
+      prefixIcon: const Icon(Icons.account_balance_wallet_outlined,
           color: Color(0xFF00BFA5)),
       filled: true,
-      fillColor: Color(0xFFF6FBFA),
-      border: OutlineInputBorder(
+      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      border: const OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(14)),
         borderSide: BorderSide.none,
       ),
@@ -1331,7 +1542,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
           24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
       child: Column(
@@ -1509,16 +1720,23 @@ class _ReminderOptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const color = Color(0xFF7C4DFF);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.08) : Colors.grey[50],
+          color: selected
+              ? color.withOpacity(0.08)
+              : Theme.of(context).colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? color : Colors.grey.shade200,
+            color: selected
+                ? color
+                : isDark
+                    ? Colors.grey.shade700
+                    : Colors.grey.shade200,
             width: selected ? 1.5 : 1,
           ),
         ),
