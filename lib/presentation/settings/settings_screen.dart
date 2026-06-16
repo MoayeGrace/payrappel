@@ -179,7 +179,6 @@ class SettingsScreen extends StatelessWidget {
             icon: Icons.logout,
             iconColor: Colors.orange,
             title: 'Déconnexion',
-            titleColor: Colors.orange,
             onTap: () => _confirmLogout(context, authRepo),
             showChevron: false,
           ),

@@ -7,11 +7,14 @@ class BusinessProfileModel {
   final String phone;
   final String email;
   final String rccm;
+  // bankName / bankAccount kept for backward-compat with Firestore data.
+  // New users manage bank info via PaymentMethodType.bankTransfer.
   final String bankName;
   final String bankAccount;
   final String footerText;
   final String? logoPath;
   final List<PaymentMethodModel> paymentMethods;
+  final String currency;
 
   const BusinessProfileModel({
     this.companyName = '',
@@ -25,6 +28,7 @@ class BusinessProfileModel {
     this.footerText = '',
     this.logoPath,
     this.paymentMethods = const [],
+    this.currency = 'FCFA',
   });
 
   bool get isEmpty => companyName.isEmpty && ownerName.isEmpty;
@@ -46,6 +50,7 @@ class BusinessProfileModel {
     String? logoPath,
     bool clearLogo = false,
     List<PaymentMethodModel>? paymentMethods,
+    String? currency,
   }) {
     return BusinessProfileModel(
       companyName: companyName ?? this.companyName,
@@ -59,6 +64,7 @@ class BusinessProfileModel {
       footerText: footerText ?? this.footerText,
       logoPath: clearLogo ? null : (logoPath ?? this.logoPath),
       paymentMethods: paymentMethods ?? this.paymentMethods,
+      currency: currency ?? this.currency,
     );
   }
 
@@ -80,6 +86,7 @@ class BusinessProfileModel {
                   PaymentMethodModel.fromMap(e as Map<String, dynamic>))
               .toList() ??
           [],
+      currency: map['currency'] as String? ?? 'FCFA',
     );
   }
 
@@ -96,6 +103,7 @@ class BusinessProfileModel {
       'footerText': footerText,
       'logoPath': logoPath,
       'paymentMethods': paymentMethods.map((m) => m.toMap()).toList(),
+      'currency': currency,
     };
   }
 }

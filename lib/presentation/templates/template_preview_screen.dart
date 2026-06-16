@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/business_profile_model.dart';
 import '../../data/models/invoice_template_model.dart';
+import '../../data/models/payment_method_model.dart';
 import '../../providers/business_profile_provider.dart';
 
 // ── Preview profile data ──────────────────────────────────────────────────────
@@ -76,11 +77,9 @@ class TemplatePreviewScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // Bandeau layout + couleur
           Container(
             color: accent.withOpacity(0.1),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 _LayoutChip(label: _layoutLabel(template.layout), color: accent),
@@ -88,8 +87,7 @@ class TemplatePreviewScreen extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Aperçu avec données de démonstration',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                   ),
                 ),
                 Container(
@@ -105,28 +103,28 @@ class TemplatePreviewScreen extends StatelessWidget {
               ],
             ),
           ),
-          // Zone preview zoomable
           Expanded(
             child: InteractiveViewer(
               minScale: 0.6,
               maxScale: 4.0,
               child: Center(
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                   child: Consumer<BusinessProfileProvider>(
                     builder: (_, prov, __) => InvoiceDocPreview(
                       template: template,
                       accent: accent,
                       headerBg: headerBg,
                       profile: PreviewProfile.from(prov.profile),
+                      paymentMethods: prov.profile.paymentMethods
+                          .where((m) => m.isEnabled)
+                          .toList(),
                     ),
                   ),
                 ),
               ),
             ),
           ),
-          // Bouton "Personnaliser"
           SafeArea(
             top: false,
             child: Padding(
@@ -198,6 +196,91 @@ class _LayoutChip extends StatelessWidget {
   }
 }
 
+// ── Selectable zone (for interactive editor) ──────────────────────────────────
+
+class _SelectableZone extends StatelessWidget {
+  final TemplateSectionId id;
+  final TemplateSectionId? selected;
+  final ValueChanged<TemplateSectionId?>? onTap;
+  final Widget child;
+
+  const _SelectableZone({
+    required this.id,
+    required this.selected,
+    this.onTap,
+    required this.child,
+  });
+
+  bool get _isSelected => id == selected;
+
+  static const _blue = Color(0xFF1A73E8);
+
+  String get _label => switch (id) {
+        TemplateSectionId.topLeft => 'En-tête G.',
+        TemplateSectionId.topRight => 'En-tête D.',
+        TemplateSectionId.bottomCenter => 'Pied de page',
+        _ => '',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    if (onTap == null) return child;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => onTap!(_isSelected ? null : id),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          child,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  border: _isSelected
+                      ? Border.all(color: _blue, width: 1.5)
+                      : Border.all(color: Colors.transparent, width: 1.5),
+                ),
+              ),
+            ),
+          ),
+          if (_isSelected)
+            Positioned(
+              top: -1,
+              left: 0,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: const BoxDecoration(
+                    color: _blue,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(3),
+                      bottomRight: Radius.circular(4),
+                    ),
+                  ),
+                  child: Text(
+                    _label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 6,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Inline field tap callback ─────────────────────────────────────────────────
+
+typedef OnInlineFieldTap = void Function(
+    TemplateSectionId sectionId, int fieldIndex, TemplateFieldConfig field);
+
 // ── Document preview ──────────────────────────────────────────────────────────
 
 class InvoiceDocPreview extends StatelessWidget {
@@ -206,6 +289,10 @@ class InvoiceDocPreview extends StatelessWidget {
   final Color headerBg;
   final PreviewProfile profile;
   final double elevation;
+  final TemplateSectionId? selectedSection;
+  final ValueChanged<TemplateSectionId?>? onSectionTap;
+  final List<PaymentMethodModel> paymentMethods;
+  final OnInlineFieldTap? onFieldTap;
 
   const InvoiceDocPreview({
     super.key,
@@ -214,6 +301,10 @@ class InvoiceDocPreview extends StatelessWidget {
     required this.headerBg,
     required this.profile,
     this.elevation = 6,
+    this.selectedSection,
+    this.onSectionTap,
+    this.paymentMethods = const [],
+    this.onFieldTap,
   });
 
   @override
@@ -224,14 +315,44 @@ class InvoiceDocPreview extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: switch (template.layout) {
-          TemplateLayout.classic =>
-            _ClassicDoc(accent: accent, template: template, profile: profile),
-          TemplateLayout.modern =>
-            _ModernDoc(accent: accent, headerBg: headerBg, template: template, profile: profile),
-          TemplateLayout.minimal =>
-            _MinimalDoc(accent: accent, template: template, profile: profile),
-          TemplateLayout.bold =>
-            _BoldDoc(accent: accent, headerBg: headerBg, template: template, profile: profile),
+          TemplateLayout.classic => _ClassicDoc(
+              accent: accent,
+              template: template,
+              profile: profile,
+              selectedSection: selectedSection,
+              onSectionTap: onSectionTap,
+              paymentMethods: paymentMethods,
+              onFieldTap: onFieldTap,
+            ),
+          TemplateLayout.modern => _ModernDoc(
+              accent: accent,
+              headerBg: headerBg,
+              template: template,
+              profile: profile,
+              selectedSection: selectedSection,
+              onSectionTap: onSectionTap,
+              paymentMethods: paymentMethods,
+              onFieldTap: onFieldTap,
+            ),
+          TemplateLayout.minimal => _MinimalDoc(
+              accent: accent,
+              template: template,
+              profile: profile,
+              selectedSection: selectedSection,
+              onSectionTap: onSectionTap,
+              paymentMethods: paymentMethods,
+              onFieldTap: onFieldTap,
+            ),
+          TemplateLayout.bold => _BoldDoc(
+              accent: accent,
+              headerBg: headerBg,
+              template: template,
+              profile: profile,
+              selectedSection: selectedSection,
+              onSectionTap: onSectionTap,
+              paymentMethods: paymentMethods,
+              onFieldTap: onFieldTap,
+            ),
         },
       ),
     );
@@ -244,7 +365,20 @@ class _ClassicDoc extends StatelessWidget {
   final Color accent;
   final InvoiceTemplateModel template;
   final PreviewProfile profile;
-  const _ClassicDoc({required this.accent, required this.template, required this.profile});
+  final TemplateSectionId? selectedSection;
+  final ValueChanged<TemplateSectionId?>? onSectionTap;
+  final List<PaymentMethodModel> paymentMethods;
+  final OnInlineFieldTap? onFieldTap;
+
+  const _ClassicDoc({
+    required this.accent,
+    required this.template,
+    required this.profile,
+    this.selectedSection,
+    this.onSectionTap,
+    this.paymentMethods = const [],
+    this.onFieldTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -254,15 +388,13 @@ class _ClassicDoc extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── En-tête redesigné : bordure gauche accent ─────────────────────
+          // ── En-tête ───────────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
             decoration: BoxDecoration(
               color: accent.withOpacity(0.05),
               borderRadius: BorderRadius.circular(5),
-              border: Border(
-                left: BorderSide(color: accent, width: 3),
-              ),
+              border: Border(left: BorderSide(color: accent, width: 3)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,77 +402,83 @@ class _ClassicDoc extends StatelessWidget {
                 // Gauche : logo + société
                 Expanded(
                   flex: 3,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (template.showLogo) ...[
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: accent.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(5),
+                  child: _SelectableZone(
+                    id: TemplateSectionId.topLeft,
+                    selected: selectedSection,
+                    onTap: onSectionTap,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (template.showLogo) ...[
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: accent.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Icon(Icons.business, color: accent, size: 20),
                           ),
-                          child: Icon(Icons.business, color: accent, size: 20),
+                          const SizedBox(width: 8),
+                        ],
+                        Expanded(
+                          child: template.topLeft.isEmpty
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _bold(profile.companyName, size: 12),
+                                    if (profile.address.isNotEmpty) _grey(profile.address),
+                                    if (profile.phone.isNotEmpty) _grey(profile.phone),
+                                  ],
+                                )
+                              : _renderSection(template.topLeft, profile,
+                                  boldColor: const Color(0xFF202124),
+                                  baseFontSize: 9,
+                                  sectionId: TemplateSectionId.topLeft,
+                                  onFieldTap: onFieldTap),
                         ),
-                        const SizedBox(width: 8),
                       ],
-                      Expanded(
-                        child: template.topLeft.isEmpty
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _bold(profile.companyName, size: 12),
-                                  if (profile.address.isNotEmpty)
-                                    _grey(profile.address),
-                                  if (profile.phone.isNotEmpty)
-                                    _grey(profile.phone),
-                                ],
-                              )
-                            : _renderSection(template.topLeft, profile,
-                                boldColor: const Color(0xFF202124),
-                                baseFontSize: 9),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Droite : badge titre + numéro + méta
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: accent,
-                        borderRadius: BorderRadius.circular(4),
+                // Droite : badge + numéro + méta
+                _SelectableZone(
+                  id: TemplateSectionId.topRight,
+                  selected: selectedSection,
+                  onTap: onSectionTap,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: accent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          template.titleLabel,
+                          style: TextStyle(
+                              color: TemplatePreviewScreen._contrastColor(accent),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2),
+                        ),
                       ),
-                      child: Text(
-                        template.titleLabel,
-                        style: TextStyle(
-                            color: TemplatePreviewScreen._contrastColor(accent),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'N° FAC-2026-A3B4C5',
-                      style: TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                          color: accent),
-                    ),
-                    const SizedBox(height: 3),
-                    if (template.topRight.isEmpty) ...[
-                      _metaRow('Émise le', '01/01/2026'),
-                      _metaRow('Échéance', '31/01/2026'),
-                    ] else
-                      _renderSection(template.topRight, profile,
-                          baseFontSize: 8),
-                  ],
+                      const SizedBox(height: 4),
+                      Text('N° FAC-2026-A3B4C5',
+                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: accent)),
+                      const SizedBox(height: 3),
+                      if (template.topRight.isEmpty) ...[
+                        _metaRow('Émise le', '01/01/2026'),
+                        _metaRow('Échéance', '31/01/2026'),
+                      ] else
+                        _renderSection(template.topRight, profile,
+                            baseFontSize: 8,
+                            sectionId: TemplateSectionId.topRight,
+                            onFieldTap: onFieldTap),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -379,9 +517,14 @@ class _ClassicDoc extends StatelessWidget {
           const SizedBox(height: 14),
           _tablePreview(template, accent),
           _amountsBox(accent),
-          if (template.showPaymentMethods) _paymentMethodsHint(accent),
+          if (template.showPaymentMethods) _paymentMethodsBlock(template, accent, paymentMethods),
           const SizedBox(height: 14),
-          _footerSection(template.bottomCenter, accent, profile),
+          _SelectableZone(
+            id: TemplateSectionId.bottomCenter,
+            selected: selectedSection,
+            onTap: onSectionTap,
+            child: _footerSection(template.bottomCenter, accent, profile, onFieldTap: onFieldTap),
+          ),
         ],
       ),
     );
@@ -395,7 +538,21 @@ class _ModernDoc extends StatelessWidget {
   final Color headerBg;
   final InvoiceTemplateModel template;
   final PreviewProfile profile;
-  const _ModernDoc({required this.accent, required this.headerBg, required this.template, required this.profile});
+  final TemplateSectionId? selectedSection;
+  final ValueChanged<TemplateSectionId?>? onSectionTap;
+  final List<PaymentMethodModel> paymentMethods;
+  final OnInlineFieldTap? onFieldTap;
+
+  const _ModernDoc({
+    required this.accent,
+    required this.headerBg,
+    required this.template,
+    required this.profile,
+    this.selectedSection,
+    this.onSectionTap,
+    this.paymentMethods = const [],
+    this.onFieldTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -403,7 +560,7 @@ class _ModernDoc extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Bandeau coloré pleine largeur
+        // Bandeau coloré
         Container(
           color: headerBg,
           padding: const EdgeInsets.all(16),
@@ -423,50 +580,52 @@ class _ModernDoc extends StatelessWidget {
                 const SizedBox(width: 10),
               ],
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(profile.companyName,
-                        style: TextStyle(
-                            color: textOnHeader,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold)),
-                    if (profile.address.isNotEmpty)
-                      Text(profile.address,
+                child: _SelectableZone(
+                  id: TemplateSectionId.topLeft,
+                  selected: selectedSection,
+                  onTap: onSectionTap,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(profile.companyName,
                           style: TextStyle(
-                              color: textOnHeader.withOpacity(0.7),
-                              fontSize: 9)),
-                    if (profile.phone.isNotEmpty)
-                      Text(profile.phone,
-                          style: TextStyle(
-                              color: textOnHeader.withOpacity(0.7),
-                              fontSize: 9)),
-                  ],
+                              color: textOnHeader,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold)),
+                      if (profile.address.isNotEmpty)
+                        Text(profile.address,
+                            style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 9)),
+                      if (profile.phone.isNotEmpty)
+                        Text(profile.phone,
+                            style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 9)),
+                    ],
+                  ),
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(template.titleLabel,
-                      style: TextStyle(
-                          color: textOnHeader,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2)),
-                  const SizedBox(height: 3),
-                  Text('N° FAC-2026-A3B4C5',
-                      style: TextStyle(
-                          color: textOnHeader,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 2),
-                  Text('Facture Janv. 2026',
-                      style: TextStyle(
-                          color: textOnHeader.withOpacity(0.7), fontSize: 9)),
-                  Text('Éch. : 31/01/2026',
-                      style: TextStyle(
-                          color: textOnHeader.withOpacity(0.7), fontSize: 9)),
-                ],
+              _SelectableZone(
+                id: TemplateSectionId.topRight,
+                selected: selectedSection,
+                onTap: onSectionTap,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(template.titleLabel,
+                        style: TextStyle(
+                            color: textOnHeader,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 2)),
+                    const SizedBox(height: 3),
+                    Text('N° FAC-2026-A3B4C5',
+                        style: TextStyle(
+                            color: textOnHeader, fontSize: 9, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 2),
+                    Text('Facture Janv. 2026',
+                        style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 9)),
+                    Text('Éch. : 31/01/2026',
+                        style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 9)),
+                  ],
+                ),
               ),
             ],
           ),
@@ -497,9 +656,15 @@ class _ModernDoc extends StatelessWidget {
               const SizedBox(height: 14),
               _tablePreview(template, accent),
               _amountsBox(accent),
-              if (template.showPaymentMethods) _paymentMethodsHint(accent),
+              if (template.showPaymentMethods)
+                _paymentMethodsBlock(template, accent, paymentMethods),
               const SizedBox(height: 14),
-              _footerSection(template.bottomCenter, accent, profile),
+              _SelectableZone(
+                id: TemplateSectionId.bottomCenter,
+                selected: selectedSection,
+                onTap: onSectionTap,
+                child: _footerSection(template.bottomCenter, accent, profile, onFieldTap: onFieldTap),
+              ),
             ],
           ),
         ),
@@ -514,7 +679,20 @@ class _MinimalDoc extends StatelessWidget {
   final Color accent;
   final InvoiceTemplateModel template;
   final PreviewProfile profile;
-  const _MinimalDoc({required this.accent, required this.template, required this.profile});
+  final TemplateSectionId? selectedSection;
+  final ValueChanged<TemplateSectionId?>? onSectionTap;
+  final List<PaymentMethodModel> paymentMethods;
+  final OnInlineFieldTap? onFieldTap;
+
+  const _MinimalDoc({
+    required this.accent,
+    required this.template,
+    required this.profile,
+    this.selectedSection,
+    this.onSectionTap,
+    this.paymentMethods = const [],
+    this.onFieldTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -524,33 +702,41 @@ class _MinimalDoc extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header : nom + FACTURE en couleur accent
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _bold(profile.companyName, size: 14),
-                    if (profile.phone.isNotEmpty) _grey(profile.phone),
-                    if (profile.email.isNotEmpty) _grey(profile.email),
-                  ],
+                child: _SelectableZone(
+                  id: TemplateSectionId.topLeft,
+                  selected: selectedSection,
+                  onTap: onSectionTap,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _bold(profile.companyName, size: 14),
+                      if (profile.phone.isNotEmpty) _grey(profile.phone),
+                      if (profile.email.isNotEmpty) _grey(profile.email),
+                    ],
+                  ),
                 ),
               ),
-              Text(
-                template.titleLabel,
-                style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: accent,
-                    letterSpacing: 2),
+              _SelectableZone(
+                id: TemplateSectionId.topRight,
+                selected: selectedSection,
+                onTap: onSectionTap,
+                child: Text(
+                  template.titleLabel,
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: accent,
+                      letterSpacing: 2),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Container(height: 1.5, color: accent),
           const SizedBox(height: 12),
-          // Détails : infos facture | client côte à côte
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,10 +750,7 @@ class _MinimalDoc extends StatelessWidget {
                       _bold('Facture Janv. 2026', size: 11),
                       const SizedBox(height: 2),
                       Text('N° FAC-2026-A3B4C5',
-                          style: TextStyle(
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                              color: accent)),
+                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: accent)),
                       const SizedBox(height: 4),
                       _metaRow('Émise', '01/01/2026'),
                       _metaRow('Échéance', '31/01/2026'),
@@ -596,9 +779,15 @@ class _MinimalDoc extends StatelessWidget {
           const SizedBox(height: 10),
           _tablePreview(template, accent),
           _amountsBox(accent),
-          if (template.showPaymentMethods) _paymentMethodsHint(accent),
+          if (template.showPaymentMethods)
+            _paymentMethodsBlock(template, accent, paymentMethods),
           const SizedBox(height: 14),
-          _footerSection(template.bottomCenter, accent, profile),
+          _SelectableZone(
+            id: TemplateSectionId.bottomCenter,
+            selected: selectedSection,
+            onTap: onSectionTap,
+            child: _footerSection(template.bottomCenter, accent, profile, onFieldTap: onFieldTap),
+          ),
         ],
       ),
     );
@@ -612,23 +801,31 @@ class _BoldDoc extends StatelessWidget {
   final Color headerBg;
   final InvoiceTemplateModel template;
   final PreviewProfile profile;
-  const _BoldDoc(
-      {required this.accent,
-      required this.headerBg,
-      required this.template,
-      required this.profile});
+  final TemplateSectionId? selectedSection;
+  final ValueChanged<TemplateSectionId?>? onSectionTap;
+  final List<PaymentMethodModel> paymentMethods;
+  final OnInlineFieldTap? onFieldTap;
+
+  const _BoldDoc({
+    required this.accent,
+    required this.headerBg,
+    required this.template,
+    required this.profile,
+    this.selectedSection,
+    this.onSectionTap,
+    this.paymentMethods = const [],
+    this.onFieldTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final textOnHeader = TemplatePreviewScreen._contrastColor(headerBg);
     final topTitle = template.topCenter.fields.isNotEmpty
-        ? (template.topCenter.fields.first.manualValue ??
-            template.titleLabel)
+        ? (template.topCenter.fields.first.manualValue ?? template.titleLabel)
         : template.titleLabel;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Bandeau épais
         Container(
           color: headerBg,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
@@ -646,48 +843,49 @@ class _BoldDoc extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  topTitle.toUpperCase(),
-                  style: TextStyle(
-                      color: textOnHeader,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 3),
+                child: _SelectableZone(
+                  id: TemplateSectionId.topLeft,
+                  selected: selectedSection,
+                  onTap: onSectionTap,
+                  child: Text(
+                    topTitle.toUpperCase(),
+                    style: TextStyle(
+                        color: textOnHeader,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 3),
+                  ),
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('Facture Janv. 2026',
-                      style: TextStyle(
-                          color: textOnHeader,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 2),
-                  Text('N° FAC-2026-A3B4C5',
-                      style: TextStyle(
-                          color: textOnHeader,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 2),
-                  Text('Émis le 01/01/2026',
-                      style: TextStyle(
-                          color: textOnHeader.withOpacity(0.7), fontSize: 8)),
-                  Text('Éch. 31/01/2026',
-                      style: TextStyle(
-                          color: textOnHeader.withOpacity(0.7), fontSize: 8)),
-                ],
+              _SelectableZone(
+                id: TemplateSectionId.topRight,
+                selected: selectedSection,
+                onTap: onSectionTap,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('Facture Janv. 2026',
+                        style: TextStyle(
+                            color: textOnHeader, fontSize: 9, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text('N° FAC-2026-A3B4C5',
+                        style: TextStyle(
+                            color: textOnHeader, fontSize: 8, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 2),
+                    Text('Émis le 01/01/2026',
+                        style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 8)),
+                    Text('Éch. 31/01/2026',
+                        style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 8)),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-        // Barre accent
         Container(
           height: 4,
-          color: accent.withOpacity(
-              accent.computeLuminance() > 0.5 ? 0.7 : 0.5),
+          color: accent.withOpacity(accent.computeLuminance() > 0.5 ? 0.7 : 0.5),
         ),
-        // Corps
         Container(
           color: Colors.white,
           padding: const EdgeInsets.all(16),
@@ -723,9 +921,15 @@ class _BoldDoc extends StatelessWidget {
               const SizedBox(height: 14),
               _tablePreview(template, accent),
               _amountsBox(accent),
-              if (template.showPaymentMethods) _paymentMethodsHint(accent),
+              if (template.showPaymentMethods)
+                _paymentMethodsBlock(template, accent, paymentMethods),
               const SizedBox(height: 14),
-              _footerSection(template.bottomCenter, accent, profile),
+              _SelectableZone(
+                id: TemplateSectionId.bottomCenter,
+                selected: selectedSection,
+                onTap: onSectionTap,
+                child: _footerSection(template.bottomCenter, accent, profile, onFieldTap: onFieldTap),
+              ),
             ],
           ),
         ),
@@ -776,17 +980,81 @@ Widget _tablePreview(InvoiceTemplateModel template, Color accent) {
   );
 }
 
-Widget _paymentMethodsHint(Color accent) {
-  return Padding(
-    padding: const EdgeInsets.only(top: 8),
-    child: Row(
-      children: [
+/// Affiche les vrais logos + labels des moyens de paiement sélectionnés.
+Widget _paymentMethodsBlock(
+  InvoiceTemplateModel template,
+  Color accent,
+  List<PaymentMethodModel> allMethods,
+) {
+  final methods = template.selectedPaymentMethodIds.isEmpty
+      ? allMethods
+      : allMethods
+          .where((m) => template.selectedPaymentMethodIds.contains(m.id))
+          .toList();
+
+  if (methods.isEmpty) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(children: [
         Icon(Icons.payment_outlined, size: 9, color: Colors.grey.shade400),
         const SizedBox(width: 4),
         Text('Moyens de paiement',
             style: TextStyle(fontSize: 7, color: Colors.grey.shade400)),
-      ],
-    ),
+      ]),
+    );
+  }
+
+  return Padding(
+    padding: const EdgeInsets.only(top: 10),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('PAIEMENT',
+          style: TextStyle(
+              fontSize: 6,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade400,
+              letterSpacing: 0.8)),
+      const SizedBox(height: 5),
+      Wrap(
+        spacing: 5,
+        runSpacing: 4,
+        children: methods.take(5).map((m) {
+          final color = m.type.color;
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: color.withOpacity(0.3), width: 0.5),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (m.type.assetPath != null)
+                Image.asset(
+                  m.type.assetPath!,
+                  width: 12,
+                  height: 12,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) =>
+                      Icon(m.type.icon, size: 9, color: color),
+                )
+              else
+                Icon(m.type.icon, size: 9, color: color),
+              const SizedBox(width: 3),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(m.label,
+                    style: TextStyle(
+                        fontSize: 7,
+                        fontWeight: FontWeight.w700,
+                        color: color)),
+                if (m.fields.isNotEmpty && m.fields.values.first.isNotEmpty)
+                  Text(m.fields.values.first,
+                      style: const TextStyle(
+                          fontSize: 5.5, color: Color(0xFF9AA0A6))),
+              ]),
+            ]),
+          );
+        }).toList(),
+      ),
+    ]),
   );
 }
 
@@ -798,8 +1066,8 @@ Widget _partyBox({
 }) {
   return Container(
     padding: const EdgeInsets.all(9),
-    decoration: BoxDecoration(
-        color: bg, borderRadius: BorderRadius.circular(5)),
+    decoration:
+        BoxDecoration(color: bg, borderRadius: BorderRadius.circular(5)),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -827,9 +1095,7 @@ Widget _invoiceInfoBox(Color accent) {
         const SizedBox(height: 2),
         Text('N° FAC-2026-A3B4C5',
             style: TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.bold,
-                color: accent)),
+                fontSize: 8, fontWeight: FontWeight.bold, color: accent)),
         const SizedBox(height: 3),
         _metaRow('Émise', '01/01/2026'),
         _metaRow('Éch.', '31/01/2026'),
@@ -848,8 +1114,8 @@ Widget _amountsBox(Color accent) {
     child: Row(
       children: [
         Expanded(
-            child: _amountTile('Montant total', '150 000 FCFA',
-                const Color(0xFF202124))),
+            child: _amountTile(
+                'Montant total', '150 000 FCFA', const Color(0xFF202124))),
         Container(width: 0.5, height: 34, color: Colors.grey.shade200),
         Expanded(
             child: _amountTile(
@@ -882,7 +1148,6 @@ Widget _amountTile(String label, String value, Color color,
     ],
   );
 }
-
 
 // ── Section rendering helpers ─────────────────────────────────────────────────
 
@@ -934,6 +1199,8 @@ Widget _renderSection(
   Color boldColor = const Color(0xFF202124),
   double baseFontSize = 9,
   TextOverflow overflow = TextOverflow.ellipsis,
+  TemplateSectionId? sectionId,
+  OnInlineFieldTap? onFieldTap,
 }) {
   if (section.isEmpty) return const SizedBox.shrink();
   final crossAlign = _crossAlign(section.alignment);
@@ -947,13 +1214,15 @@ Widget _renderSection(
 
   final col = Column(
     crossAxisAlignment: crossAlign,
-    children: section.fields.map<Widget>((f) {
+    children: section.fields.asMap().entries.map<Widget>((entry) {
+      final i = entry.key;
+      final f = entry.value;
       final text = _fieldValue(f, profile);
       if (text.isEmpty) return const SizedBox.shrink();
       final fg = f.textColor != null
           ? Color(f.textColor!)
           : (f.bold ? effectiveBold : effectiveBase);
-      return Text(
+      Widget w = Text(
         text,
         textAlign: tAlign,
         overflow: overflow,
@@ -963,6 +1232,13 @@ Widget _renderSection(
           color: fg,
         ),
       );
+      if (onFieldTap != null && sectionId != null) {
+        w = GestureDetector(
+          onTap: () => onFieldTap(sectionId, i, f),
+          child: w,
+        );
+      }
+      return w;
     }).toList(),
   );
 
@@ -980,43 +1256,73 @@ Widget _renderSection(
 }
 
 Widget _footerSection(
-    TemplateSectionModel section, Color accent, PreviewProfile profile) {
+    TemplateSectionModel section, Color accent, PreviewProfile profile, {
+    OnInlineFieldTap? onFieldTap,
+}) {
   final tAlign = _textAlign(section.alignment);
   final crossAlign = _crossAlign(section.alignment);
-  return Column(
+  final bgColor =
+      section.backgroundColor != null ? Color(section.backgroundColor!) : null;
+  final onDark = bgColor != null && _isColorDark(bgColor);
+
+  final content = Column(
     crossAxisAlignment: crossAlign,
     children: [
       Divider(color: Colors.grey.shade200, thickness: 0.5),
       const SizedBox(height: 4),
       if (section.isEmpty) ...[
-        Text('Ma Banque — Compte 123456789',
-            style: TextStyle(fontSize: 8, color: Colors.grey.shade400),
-            textAlign: TextAlign.center),
-        const SizedBox(height: 2),
         Text('Merci pour votre confiance.',
-            style: TextStyle(fontSize: 8, color: Colors.grey.shade400),
+            style: TextStyle(
+                fontSize: 8,
+                color: onDark ? Colors.white70 : Colors.grey.shade400),
             textAlign: TextAlign.center),
       ] else
-        ...section.fields.map<Widget>((f) {
+        ...section.fields.asMap().entries.map<Widget>((entry) {
+          final i = entry.key;
+          final f = entry.value;
           final text = _fieldValue(f, profile);
           if (text.isEmpty) return const SizedBox.shrink();
-          return Text(
+          final fg = f.textColor != null
+              ? Color(f.textColor!)
+              : (onDark ? Colors.white70 : Colors.grey.shade500);
+          Widget w = Text(
             text,
             textAlign: tAlign,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: f.large ? 11 : 8,
               fontWeight: f.bold ? FontWeight.bold : FontWeight.normal,
-              color: Colors.grey.shade500,
+              color: fg,
             ),
           );
+          if (onFieldTap != null) {
+            w = GestureDetector(
+              onTap: () => onFieldTap(TemplateSectionId.bottomCenter, i, f),
+              child: w,
+            );
+          }
+          return w;
         }),
       const SizedBox(height: 2),
       Text('Document généré par PayRappel',
-          style: TextStyle(fontSize: 7, color: Colors.grey.shade300),
+          style: TextStyle(
+              fontSize: 7,
+              color: onDark ? Colors.white38 : Colors.grey.shade300),
           textAlign: TextAlign.center),
     ],
   );
+
+  if (bgColor != null) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: content,
+    );
+  }
+  return content;
 }
 
 Widget _sectionLabel(String text) => Text(

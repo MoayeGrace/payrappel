@@ -7,9 +7,10 @@ import '../../providers/business_profile_provider.dart';
 import '../../providers/invoice_template_provider.dart';
 import 'template_preview_screen.dart';
 
+// ── Editor screen ─────────────────────────────────────────────────────────────
+
 class TemplateEditorScreen extends StatefulWidget {
   final InvoiceTemplateModel template;
-
   const TemplateEditorScreen({super.key, required this.template});
 
   @override
@@ -21,7 +22,25 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
   late InvoiceTemplateModel _template;
   late final TextEditingController _nameCtrl;
   late final TabController _tabCtrl;
+  TemplateSectionId? _selectedSection;
   bool _saving = false;
+
+  static const _blue = Color(0xFF1A73E8);
+
+  static const _sectionsMeta = [
+    _SectionMeta(
+        id: TemplateSectionId.topLeft,
+        label: 'En-tête G.',
+        icon: Icons.business_outlined),
+    _SectionMeta(
+        id: TemplateSectionId.topRight,
+        label: 'En-tête D.',
+        icon: Icons.receipt_long_outlined),
+    _SectionMeta(
+        id: TemplateSectionId.bottomCenter,
+        label: 'Pied de page',
+        icon: Icons.article_outlined),
+  ];
 
   @override
   void initState() {
@@ -29,7 +48,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
     _template = widget.template;
     final suffix = _template.isBuiltIn ? ' (Copie)' : '';
     _nameCtrl = TextEditingController(text: '${_template.name}$suffix');
-    _tabCtrl = TabController(length: 3, vsync: this);
+    _tabCtrl = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -63,6 +82,85 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
     }
   }
 
+  void _onSectionTap(TemplateSectionId? id) {
+    setState(() {
+      _selectedSection = id;
+      if (id != null) _tabCtrl.animateTo(2);
+    });
+  }
+
+  void _onInlineFieldTap(
+      TemplateSectionId sectionId, int fieldIndex, TemplateFieldConfig field) {
+    _onSectionTap(sectionId);
+    if (field.source != FieldSource.manual) return;
+
+    final ctrl = TextEditingController(text: field.manualValue ?? '');
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Modifier le texte', style: TextStyle(fontSize: 15)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Entrez votre texte…',
+            border: OutlineInputBorder(),
+            isDense: true,
+            contentPadding:
+                EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          style: const TextStyle(fontSize: 14),
+          onSubmitted: (_) =>
+              _saveInlineEdit(ctx, sectionId, fieldIndex, field, ctrl),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                _saveInlineEdit(ctx, sectionId, fieldIndex, field, ctrl),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _saveInlineEdit(
+    BuildContext ctx,
+    TemplateSectionId sectionId,
+    int fieldIndex,
+    TemplateFieldConfig field,
+    TextEditingController ctrl,
+  ) {
+    final newVal = ctrl.text.trim();
+    final section = _getSection(sectionId);
+    final newFields = List<TemplateFieldConfig>.from(section.fields);
+    newFields[fieldIndex] =
+        field.copyWith(manualValue: newVal.isEmpty ? null : newVal);
+    setState(
+        () => _template = _setSection(sectionId, section.copyWith(fields: newFields)));
+    Navigator.pop(ctx);
+  }
+
+  TemplateSectionModel _getSection(TemplateSectionId id) => switch (id) {
+        TemplateSectionId.topLeft => _template.topLeft,
+        TemplateSectionId.topRight => _template.topRight,
+        TemplateSectionId.bottomCenter => _template.bottomCenter,
+        _ => _template.topLeft,
+      };
+
+  InvoiceTemplateModel _setSection(
+          TemplateSectionId id, TemplateSectionModel s) =>
+      switch (id) {
+        TemplateSectionId.topLeft => _template.copyWith(topLeft: s),
+        TemplateSectionId.topRight => _template.copyWith(topRight: s),
+        TemplateSectionId.bottomCenter => _template.copyWith(bottomCenter: s),
+        _ => _template,
+      };
+
   @override
   Widget build(BuildContext context) {
     final accent = Color(_template.accentColor);
@@ -72,77 +170,63 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFDDE1E7),
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: accent,
-        foregroundColor: Colors.white,
-        title: TextField(
-          controller: _nameCtrl,
-          style: const TextStyle(
-              color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-          decoration: InputDecoration(
-            border: InputBorder.none,
-            hintText: 'Nom du template',
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
-          ),
-        ),
-        actions: [
-          if (_saving)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Center(
-                child: SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2),
-                ),
-              ),
-            )
-          else
-            TextButton.icon(
-              onPressed: _save,
-              icon: const Icon(Icons.save_outlined, color: Colors.white),
-              label: const Text('Enregistrer',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600)),
-            ),
-        ],
-      ),
+      appBar: _buildAppBar(accent),
       body: Column(
         children: [
-          // ── Aperçu live (feuille document, occupe ~55% de l'écran) ───────
+          // ── Canvas live preview ~55% ───────────────────────────────────────
           Expanded(
             flex: 55,
             child: Consumer<BusinessProfileProvider>(
               builder: (_, prov, __) {
                 final profile = PreviewProfile.from(prov.profile);
-                return Container(
-                  color: const Color(0xFFDDE1E7),
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                  child: Center(
-                    child: FractionallySizedBox(
-                      widthFactor: 0.94,
-                      child: FittedBox(
-                        fit: BoxFit.contain,
-                        alignment: Alignment.topCenter,
-                        child: SizedBox(
-                          width: 380,
-                          child: InvoiceDocPreview(
-                            key: ObjectKey(_template),
-                            template: _template,
-                            accent: accent,
-                            headerBg: headerBg,
-                            profile: profile,
+                final paymentMethods = prov.profile.paymentMethods
+                    .where((m) => m.isEnabled)
+                    .toList();
+                return Column(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        color: const Color(0xFFDDE1E7),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                        child: Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.94,
+                            child: FittedBox(
+                              fit: BoxFit.contain,
+                              alignment: Alignment.topCenter,
+                              child: SizedBox(
+                                width: 380,
+                                child: InvoiceDocPreview(
+                                  template: _template,
+                                  accent: accent,
+                                  headerBg: headerBg,
+                                  profile: profile,
+                                  selectedSection: _selectedSection,
+                                  onSectionTap: _onSectionTap,
+                                  onFieldTap: _onInlineFieldTap,
+                                  paymentMethods: paymentMethods,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                    _buildSectionChips(accent),
+                  ],
                 );
               },
             ),
           ),
-          // ── Panneau d'édition avec onglets (bas ~45%) ─────────────────────
+          // ── Quick toolbar (visible quand une section est sélectionnée) ─────
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            child: _selectedSection != null
+                ? _buildQuickToolbar(accent)
+                : const SizedBox.shrink(),
+          ),
+          // ── Panneau d'édition 6 onglets ~45% ──────────────────────────────
           Expanded(
             flex: 45,
             child: Material(
@@ -154,34 +238,17 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
                     const BorderRadius.vertical(top: Radius.circular(16)),
                 child: Column(
                   children: [
-                    Container(
-                      color: Colors.white,
-                      child: TabBar(
-                        controller: _tabCtrl,
-                        labelColor: accent,
-                        unselectedLabelColor: Colors.grey,
-                        indicatorColor: accent,
-                        labelStyle: const TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w600),
-                        unselectedLabelStyle:
-                            const TextStyle(fontSize: 11),
-                        tabs: const [
-                          Tab(icon: Icon(Icons.palette_outlined, size: 17), text: 'Style'),
-                          Tab(icon: Icon(Icons.view_list_outlined, size: 17), text: 'Sections'),
-                          Tab(icon: Icon(Icons.table_chart_outlined, size: 17), text: 'Tableau'),
-                        ],
-                      ),
-                    ),
+                    _buildTabBar(accent),
                     Expanded(
                       child: TabBarView(
                         controller: _tabCtrl,
                         children: [
-                          // ── Tab 0 : Style ──────────────────────────────
-                          _buildStyleTab(accent),
-                          // ── Tab 1 : Sections ───────────────────────────
-                          _buildSectionsTab(context),
-                          // ── Tab 2 : Tableau ────────────────────────────
-                          _buildTableTab(accent),
+                          _buildDesignTab(accent),
+                          _buildSectionsTab(accent),
+                          _buildChampsTab(accent),
+                          _buildTableauTab(accent),
+                          _buildPaiementTab(accent),
+                          _buildAutomatisationTab(),
                         ],
                       ),
                     ),
@@ -195,7 +262,329 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
     );
   }
 
-  Widget _buildStyleTab(Color accent) {
+  // ── AppBar ────────────────────────────────────────────────────────────────────
+
+  PreferredSizeWidget _buildAppBar(Color accent) {
+    return AppBar(
+      elevation: 0,
+      backgroundColor: accent,
+      foregroundColor: Colors.white,
+      title: TextField(
+        controller: _nameCtrl,
+        style: const TextStyle(
+            color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          hintText: 'Nom du template',
+          hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+        ),
+      ),
+      actions: [
+        if (_saving)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2)),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: FilledButton(
+              onPressed: _save,
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: accent,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+                textStyle: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 13),
+              ),
+              child: const Text('Enregistrer'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ── Tab bar ───────────────────────────────────────────────────────────────────
+
+  Widget _buildTabBar(Color accent) {
+    return Container(
+      color: Theme.of(context).colorScheme.surface,
+      child: TabBar(
+        controller: _tabCtrl,
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
+        labelColor: accent,
+        unselectedLabelColor: Colors.grey[500],
+        indicatorColor: accent,
+        indicatorWeight: 2.5,
+        dividerColor: Colors.grey[200],
+        labelStyle:
+            const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: const TextStyle(fontSize: 11),
+        tabs: const [
+          Tab(icon: Icon(Icons.palette_outlined, size: 16), text: 'Design'),
+          Tab(
+              icon: Icon(Icons.view_quilt_outlined, size: 16),
+              text: 'Sections'),
+          Tab(
+              icon: Icon(Icons.text_fields_outlined, size: 16),
+              text: 'Champs'),
+          Tab(
+              icon: Icon(Icons.table_chart_outlined, size: 16),
+              text: 'Tableau'),
+          Tab(
+              icon: Icon(Icons.payments_outlined, size: 16),
+              text: 'Paiement'),
+          Tab(
+              icon: Icon(Icons.auto_awesome_outlined, size: 16),
+              text: 'Auto.'),
+        ],
+      ),
+    );
+  }
+
+  // ── Section chips (sous le document) ─────────────────────────────────────────
+
+  Widget _buildSectionChips(Color accent) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: _sectionsMeta.map((meta) {
+          final isSelected = _selectedSection == meta.id;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: GestureDetector(
+              onTap: () => _onSectionTap(isSelected ? null : meta.id),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isSelected ? accent : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color:
+                        isSelected ? accent : Colors.grey.shade300,
+                    width: 1,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                              color: accent.withOpacity(0.25),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2))
+                        ]
+                      : [],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(meta.icon,
+                        size: 12,
+                        color: isSelected
+                            ? Colors.white
+                            : Colors.grey[600]),
+                    const SizedBox(width: 5),
+                    Text(
+                      meta.label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? Colors.white
+                            : Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ── Quick toolbar ─────────────────────────────────────────────────────────────
+
+  Widget _buildQuickToolbar(Color accent) {
+    if (_selectedSection == null) return const SizedBox.shrink();
+    final section = _getSection(_selectedSection!);
+    final meta =
+        _sectionsMeta.firstWhere((m) => m.id == _selectedSection);
+
+    return Container(
+      color: Colors.grey[100],
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        children: [
+          Icon(meta.icon, size: 13, color: accent),
+          const SizedBox(width: 6),
+          Text(meta.label,
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: accent)),
+          const SizedBox(width: 10),
+          Container(width: 1, height: 18, color: Colors.grey[300]),
+          const SizedBox(width: 8),
+          // Alignement
+          _QuickAlignBtn(
+            icon: Icons.format_align_left,
+            selected: section.alignment == 'left',
+            accent: accent,
+            onTap: () => setState(() => _template = _setSection(
+                _selectedSection!, section.copyWith(alignment: 'left'))),
+          ),
+          _QuickAlignBtn(
+            icon: Icons.format_align_center,
+            selected: section.alignment == 'center',
+            accent: accent,
+            onTap: () => setState(() => _template = _setSection(
+                _selectedSection!, section.copyWith(alignment: 'center'))),
+          ),
+          _QuickAlignBtn(
+            icon: Icons.format_align_right,
+            selected: section.alignment == 'right',
+            accent: accent,
+            onTap: () => setState(() => _template = _setSection(
+                _selectedSection!, section.copyWith(alignment: 'right'))),
+          ),
+          const SizedBox(width: 8),
+          Container(width: 1, height: 18, color: Colors.grey[300]),
+          const SizedBox(width: 8),
+          // Fond
+          GestureDetector(
+            onTap: () => _showBgColorPicker(section),
+            child: Row(
+              children: [
+                Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: section.backgroundColor != null
+                        ? Color(section.backgroundColor!)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                        color: Colors.grey[400]!, width: 1),
+                  ),
+                  child: section.backgroundColor == null
+                      ? Icon(Icons.format_color_fill,
+                          size: 11, color: Colors.grey[500])
+                      : null,
+                ),
+                const SizedBox(width: 4),
+                Text('Fond',
+                    style:
+                        TextStyle(fontSize: 11, color: Colors.grey[600])),
+              ],
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => setState(() => _selectedSection = null),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.close, size: 12, color: Colors.grey[600]),
+                  const SizedBox(width: 3),
+                  Text('Fermer',
+                      style: TextStyle(
+                          fontSize: 10, color: Colors.grey[600])),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBgColorPicker(TemplateSectionModel section) {
+    const palette = [
+      0xFF1A73E8, 0xFF00897B, 0xFF546E7A, 0xFF8B1A1A,
+      0xFF3949AB, 0xFF2E7D32, 0xFFE65100, 0xFF1A237E,
+      0xFF37474F, 0xFFF9A825, 0xFF0097A7, 0xFFAD1457,
+      0xFF424242, 0xFFFFFFFF, 0xFF000000,
+    ];
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title:
+            const Text('Couleur de fond', style: TextStyle(fontSize: 14)),
+        contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        content: SizedBox(
+          width: 220,
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: palette.map((c) {
+              final sel = c == section.backgroundColor;
+              return GestureDetector(
+                onTap: () {
+                  setState(() => _template = _setSection(
+                      _selectedSection!,
+                      section.copyWith(backgroundColor: c)));
+                  Navigator.pop(context);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Color(c),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: sel ? _blue : Colors.grey.shade300,
+                      width: sel ? 2.5 : 1,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() => _template = _setSection(
+                  _selectedSection!,
+                  section.copyWith(
+                      backgroundColor: null, clearBgColor: true)));
+              Navigator.pop(context);
+            },
+            child: const Text('Aucune', style: TextStyle(fontSize: 12)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Tab 0 : Design ────────────────────────────────────────────────────────────
+
+  Widget _buildDesignTab(Color accent) {
     return ListView(
       padding: const EdgeInsets.all(14),
       children: [
@@ -206,8 +595,8 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
                 label: 'Mise en page',
                 child: _LayoutPicker(
                   value: _template.layout,
-                  onChanged: (v) =>
-                      setState(() => _template = _template.copyWith(layout: v)),
+                  onChanged: (v) => setState(
+                      () => _template = _template.copyWith(layout: v)),
                 ),
               ),
               const Divider(height: 1),
@@ -223,63 +612,13 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Afficher le logo',
-                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w500, fontSize: 13)),
                 value: _template.showLogo,
                 activeColor: accent,
-                onChanged: (v) =>
-                    setState(() => _template = _template.copyWith(showLogo: v)),
-              ),
-              const Divider(height: 1),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Moyens de paiement',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
-                subtitle: const Text('Affichés en bas de la facture',
-                    style: TextStyle(fontSize: 11)),
-                value: _template.showPaymentMethods,
-                activeColor: accent,
                 onChanged: (v) => setState(
-                    () =>
-                        _template = _template.copyWith(showPaymentMethods: v)),
+                    () => _template = _template.copyWith(showLogo: v)),
               ),
-              if (_template.showPaymentMethods) ...[
-                const Divider(height: 1),
-                const SizedBox(height: 6),
-                Consumer<BusinessProfileProvider>(
-                  builder: (_, profileProv, __) {
-                    final methods = profileProv.profile.paymentMethods
-                        .where((m) => m.isEnabled)
-                        .toList();
-                    if (methods.isEmpty) {
-                      return Text(
-                        'Aucun moyen de paiement configuré.',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                      );
-                    }
-                    final selected =
-                        _template.selectedPaymentMethodIds.toSet();
-                    return Column(
-                      children: methods.map((m) {
-                        final isChecked =
-                            selected.isEmpty || selected.contains(m.id);
-                        return _PaymentMethodCheckTile(
-                          method: m,
-                          checked: isChecked,
-                          onChanged: (v) {
-                            final ns = Set<String>.from(selected.isEmpty
-                                ? methods.map((x) => x.id)
-                                : selected);
-                            if (v) { ns.add(m.id); } else { ns.remove(m.id); }
-                            setState(() => _template = _template.copyWith(
-                                selectedPaymentMethodIds: ns.toList()));
-                          },
-                        );
-                      }).toList(),
-                    );
-                  },
-                ),
-              ],
             ],
           ),
         ),
@@ -289,12 +628,13 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Couleur principale',
-                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w500, fontSize: 13)),
               const SizedBox(height: 10),
               _ColorPicker(
                 value: _template.accentColor,
-                onChanged: (v) =>
-                    setState(() => _template = _template.copyWith(accentColor: v)),
+                onChanged: (v) => setState(
+                    () => _template = _template.copyWith(accentColor: v)),
               ),
             ],
           ),
@@ -304,89 +644,27 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
     );
   }
 
-  Widget _buildSectionsTab(BuildContext context) {
-    const sectionMeta = [
-      ('En-tête centre', TemplateSectionId.topCenter),
-      ('En-tête gauche', TemplateSectionId.topLeft),
-      ('En-tête droite', TemplateSectionId.topRight),
-      ('Bas gauche', TemplateSectionId.bottomLeft),
-      ('Bas droite', TemplateSectionId.bottomRight),
-      ('Pied de page', TemplateSectionId.bottomCenter),
-    ];
+  // ── Tab 1 : Sections ──────────────────────────────────────────────────────────
 
-    TemplateSectionModel getSection(TemplateSectionId id) => switch (id) {
-          TemplateSectionId.topCenter => _template.topCenter,
-          TemplateSectionId.topLeft => _template.topLeft,
-          TemplateSectionId.topRight => _template.topRight,
-          TemplateSectionId.bottomLeft => _template.bottomLeft,
-          TemplateSectionId.bottomRight => _template.bottomRight,
-          TemplateSectionId.bottomCenter => _template.bottomCenter,
-        };
-
-    InvoiceTemplateModel setSection(
-            InvoiceTemplateModel t, TemplateSectionId id,
-            TemplateSectionModel s) =>
-        switch (id) {
-          TemplateSectionId.topCenter => t.copyWith(topCenter: s),
-          TemplateSectionId.topLeft => t.copyWith(topLeft: s),
-          TemplateSectionId.topRight => t.copyWith(topRight: s),
-          TemplateSectionId.bottomLeft => t.copyWith(bottomLeft: s),
-          TemplateSectionId.bottomRight => t.copyWith(bottomRight: s),
-          TemplateSectionId.bottomCenter => t.copyWith(bottomCenter: s),
-        };
-
-    void swapSections(TemplateSectionId a, TemplateSectionId b) {
-      final sA = getSection(a);
-      final sB = getSection(b);
-      setState(() => _template = setSection(setSection(_template, a, sB), b, sA));
-    }
-
-    Future<void> showSwapDialog(
-        String label, TemplateSectionId sourceId) async {
-      final others = sectionMeta.where((e) => e.$2 != sourceId).toList();
-      final target = await showDialog<TemplateSectionId>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('Déplacer "$label" vers'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: others
-                .map((e) => ListTile(
-                      leading: const Icon(Icons.swap_horiz,
-                          color: Color(0xFF1A73E8), size: 20),
-                      title: Text(e.$1,
-                          style: const TextStyle(fontSize: 14)),
-                      subtitle: Text('Échange le contenu des deux sections',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey[500])),
-                      onTap: () => Navigator.pop(ctx, e.$2),
-                    ))
-                .toList(),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Annuler')),
-          ],
-        ),
-      );
-      if (target != null) swapSections(sourceId, target);
-    }
-
+  Widget _buildSectionsTab(Color accent) {
     return ListView(
       padding: const EdgeInsets.all(14),
       children: [
-        ...sectionMeta.map(((String label, TemplateSectionId id) rec) {
-          final (label, id) = rec;
-          final section = getSection(id);
+        ..._sectionsMeta.map((meta) {
+          final section = _getSection(meta.id);
+          final isHighlighted = _selectedSection == meta.id;
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: _SectionEditor(
-              label: label,
+              label: meta.label,
+              icon: meta.icon,
               section: section,
-              onSwap: () => showSwapDialog(label, id),
+              accent: accent,
+              isHighlighted: isHighlighted,
+              onTap: () => setState(() =>
+                  _selectedSection = isHighlighted ? null : meta.id),
               onChanged: (updated) => setState(
-                  () => _template = setSection(_template, id, updated)),
+                  () => _template = _setSection(meta.id, updated)),
             ),
           );
         }),
@@ -395,7 +673,84 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
     );
   }
 
-  Widget _buildTableTab(Color accent) {
+  // ── Tab 2 : Champs ────────────────────────────────────────────────────────────
+
+  Widget _buildChampsTab(Color accent) {
+    if (_selectedSection == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.touch_app_outlined,
+                  size: 40, color: Colors.grey[400]),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Appuyez sur une section',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Touchez une zone du document\nou un chip ci-dessus',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final meta =
+        _sectionsMeta.firstWhere((m) => m.id == _selectedSection);
+    final section = _getSection(_selectedSection!);
+
+    return Column(
+      children: [
+        Container(
+          color: accent.withOpacity(0.08),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(meta.icon, size: 16, color: accent),
+              const SizedBox(width: 8),
+              Text(meta.label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: accent)),
+              const Spacer(),
+              Text('${section.fields.length} champ(s)',
+                  style:
+                      TextStyle(fontSize: 11, color: Colors.grey[500])),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _FieldsEditor(
+            section: section,
+            accent: accent,
+            shrinkWrap: false,
+            onChanged: (updated) => setState(
+                () => _template = _setSection(_selectedSection!, updated)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Tab 3 : Tableau ───────────────────────────────────────────────────────────
+
+  Widget _buildTableauTab(Color accent) {
     return ListView(
       padding: const EdgeInsets.all(14),
       children: [
@@ -405,33 +760,206 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
                 '${_template.customTable.columnCount}x${_template.customTable.rowCount}'),
             table: _template.customTable,
             accent: accent,
-            onChanged: (t) =>
-                setState(() => _template = _template.copyWith(customTable: t)),
+            onChanged: (t) => setState(
+                () => _template = _template.copyWith(customTable: t)),
           ),
         ),
         const SizedBox(height: 20),
       ],
     );
   }
+
+  // ── Tab 4 : Paiement ──────────────────────────────────────────────────────────
+
+  Widget _buildPaiementTab(Color accent) {
+    return ListView(
+      padding: const EdgeInsets.all(14),
+      children: [
+        _Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Afficher les moyens de paiement',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w500, fontSize: 13)),
+                subtitle: const Text('Section visible en bas de la facture',
+                    style: TextStyle(fontSize: 11)),
+                value: _template.showPaymentMethods,
+                activeColor: accent,
+                onChanged: (v) => setState(() =>
+                    _template = _template.copyWith(showPaymentMethods: v)),
+              ),
+              if (_template.showPaymentMethods) ...[
+                const Divider(height: 1),
+                const SizedBox(height: 10),
+                Consumer<BusinessProfileProvider>(
+                  builder: (_, profileProv, __) {
+                    final methods = profileProv.profile.paymentMethods
+                        .where((m) => m.isEnabled)
+                        .toList();
+                    if (methods.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Aucun moyen de paiement configuré.\nAllez dans Paramètres → Moyens de paiement.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey[500]),
+                        ),
+                      );
+                    }
+                    final selected =
+                        _template.selectedPaymentMethodIds.toSet();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cochez les moyens à afficher',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[500],
+                              fontStyle: FontStyle.italic),
+                        ),
+                        const SizedBox(height: 8),
+                        ...methods.map((m) {
+                          final isChecked =
+                              selected.isEmpty || selected.contains(m.id);
+                          return _PaymentMethodCheckTile(
+                            method: m,
+                            checked: isChecked,
+                            onChanged: (v) {
+                              final ns = Set<String>.from(
+                                  selected.isEmpty
+                                      ? methods.map((x) => x.id)
+                                      : selected);
+                              if (v) {
+                                ns.add(m.id);
+                              } else {
+                                ns.remove(m.id);
+                              }
+                              setState(() => _template =
+                                  _template.copyWith(
+                                      selectedPaymentMethodIds:
+                                          ns.toList()));
+                            },
+                          );
+                        }),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  // ── Tab 5 : Automatisation ────────────────────────────────────────────────────
+
+  Widget _buildAutomatisationTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.auto_awesome_outlined,
+                size: 40, color: Colors.amber[700]),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Bientôt disponible',
+            style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey[800]),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Automatisez l\'envoi de rappels\nselon le statut de la facture.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-enum TemplateSectionId {
-  topCenter, topLeft, topRight, bottomLeft, bottomRight, bottomCenter
+// ── Helper record ─────────────────────────────────────────────────────────────
+
+class _SectionMeta {
+  final TemplateSectionId id;
+  final String label;
+  final IconData icon;
+  const _SectionMeta(
+      {required this.id, required this.label, required this.icon});
 }
 
-// ── Section editor ────────────────────────────────────────────────────────────
+// ── Quick align button ────────────────────────────────────────────────────────
+
+class _QuickAlignBtn extends StatelessWidget {
+  final IconData icon;
+  final bool selected;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _QuickAlignBtn({
+    required this.icon,
+    required this.selected,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        margin: const EdgeInsets.only(right: 4),
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: selected ? accent.withOpacity(0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+              color: selected ? accent : Colors.grey.shade300, width: 1),
+        ),
+        child: Icon(icon,
+            size: 14, color: selected ? accent : Colors.grey[500]),
+      ),
+    );
+  }
+}
+
+// ── Section editor (onglet Sections) ─────────────────────────────────────────
 
 class _SectionEditor extends StatefulWidget {
   final String label;
+  final IconData icon;
   final TemplateSectionModel section;
+  final Color accent;
+  final bool isHighlighted;
+  final VoidCallback onTap;
   final ValueChanged<TemplateSectionModel> onChanged;
-  final VoidCallback? onSwap;
 
   const _SectionEditor({
     required this.label,
+    required this.icon,
     required this.section,
+    required this.accent,
+    required this.isHighlighted,
+    required this.onTap,
     required this.onChanged,
-    this.onSwap,
   });
 
   @override
@@ -442,124 +970,184 @@ class _SectionEditorState extends State<_SectionEditor> {
   bool _expanded = false;
 
   @override
+  void didUpdateWidget(_SectionEditor old) {
+    super.didUpdateWidget(old);
+    if (widget.isHighlighted && !old.isHighlighted) {
+      setState(() => _expanded = true);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _expanded = !_expanded),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(widget.label,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600, fontSize: 14)),
-                        ),
-                        Text(
-                          '${widget.section.fields.length} champ(s)',
-                          style:
-                              TextStyle(fontSize: 12, color: Colors.grey[500]),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                            _expanded ? Icons.expand_less : Icons.expand_more,
-                            size: 18,
-                            color: Colors.grey[500]),
-                      ],
+    final isHighlighted = widget.isHighlighted;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isHighlighted ? widget.accent : Colors.transparent,
+          width: isHighlighted ? 1.5 : 0,
+        ),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () {
+                widget.onTap();
+                setState(() => _expanded = !_expanded);
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: (isHighlighted
+                                ? widget.accent
+                                : const Color(0xFF1A73E8))
+                            .withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(widget.icon,
+                          size: 16,
+                          color: isHighlighted
+                              ? widget.accent
+                              : const Color(0xFF1A73E8)),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(widget.label,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14)),
+                    ),
+                    Text(
+                      '${widget.section.fields.length} champ(s)',
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.grey[500]),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                        _expanded
+                            ? Icons.expand_less
+                            : Icons.expand_more,
+                        size: 18,
+                        color: Colors.grey[400]),
+                  ],
                 ),
               ),
-              if (widget.onSwap != null)
-                IconButton(
-                  icon: const Icon(Icons.swap_horiz, size: 18),
-                  color: const Color(0xFF1A73E8),
-                  padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 32, minHeight: 32),
-                  tooltip: 'Déplacer cette section',
-                  onPressed: widget.onSwap,
-                ),
+            ),
+            if (_expanded) ...[
+              const SizedBox(height: 10),
+              _FieldsEditor(
+                section: widget.section,
+                accent: widget.accent,
+                shrinkWrap: true,
+                onChanged: widget.onChanged,
+              ),
             ],
-          ),
-          if (_expanded) ...[
-            const SizedBox(height: 8),
-            // Alignment
-            Row(
-              children: [
-                const Text('Alignement : ',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                _AlignmentToggle(
-                  value: widget.section.alignment,
-                  onChanged: (a) =>
-                      widget.onChanged(widget.section.copyWith(alignment: a)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Background color
-            Row(
-              children: [
-                const Text('Fond : ',
-                    style:
-                        TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                _NullableColorSwatch(
-                  label: 'Couleur de fond',
-                  value: widget.section.backgroundColor,
-                  onChanged: (v) => widget.onChanged(widget.section.copyWith(
-                      backgroundColor: v, clearBgColor: v == null)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Fields
-            ...widget.section.fields.asMap().entries.map((entry) {
-              final i = entry.key;
-              final field = entry.value;
-              return _FieldRow(
-                field: field,
-                onChanged: (updated) {
-                  final newFields = List<TemplateFieldConfig>.from(
-                      widget.section.fields);
-                  newFields[i] = updated;
-                  widget.onChanged(
-                      widget.section.copyWith(fields: newFields));
-                },
-                onDelete: () {
-                  final newFields = List<TemplateFieldConfig>.from(
-                      widget.section.fields)
-                    ..removeAt(i);
-                  widget.onChanged(
-                      widget.section.copyWith(fields: newFields));
-                },
-              );
-            }),
-            // Add field button
-            TextButton.icon(
-              onPressed: () {
-                final newFields = List<TemplateFieldConfig>.from(
-                    widget.section.fields)
-                  ..add(const TemplateFieldConfig(source: FieldSource.manual));
-                widget.onChanged(widget.section.copyWith(fields: newFields));
-              },
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Ajouter un champ', style: TextStyle(fontSize: 12)),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
-// ── Field row ──────────────────────────────────────────────────────────────────
+// ── Fields editor ─────────────────────────────────────────────────────────────
+
+class _FieldsEditor extends StatelessWidget {
+  final TemplateSectionModel section;
+  final Color accent;
+  final ValueChanged<TemplateSectionModel> onChanged;
+  final bool shrinkWrap;
+
+  const _FieldsEditor({
+    required this.section,
+    required this.accent,
+    required this.onChanged,
+    this.shrinkWrap = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+      children: [
+        Row(
+          children: [
+            Text('Alignement',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700])),
+            const SizedBox(width: 10),
+            _AlignmentToggle(
+              value: section.alignment,
+              accent: accent,
+              onChanged: (a) => onChanged(section.copyWith(alignment: a)),
+            ),
+            const Spacer(),
+            _NullableColorSwatch(
+              label: 'Couleur de fond',
+              value: section.backgroundColor,
+              onChanged: (v) => onChanged(section.copyWith(
+                  backgroundColor: v, clearBgColor: v == null)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ...section.fields.asMap().entries.map((entry) {
+          final i = entry.key;
+          final field = entry.value;
+          return _FieldRow(
+            field: field,
+            onChanged: (updated) {
+              final newFields =
+                  List<TemplateFieldConfig>.from(section.fields);
+              newFields[i] = updated;
+              onChanged(section.copyWith(fields: newFields));
+            },
+            onDelete: () {
+              final newFields =
+                  List<TemplateFieldConfig>.from(section.fields)
+                    ..removeAt(i);
+              onChanged(section.copyWith(fields: newFields));
+            },
+          );
+        }),
+        TextButton.icon(
+          onPressed: () {
+            final newFields =
+                List<TemplateFieldConfig>.from(section.fields)
+                  ..add(const TemplateFieldConfig(
+                      source: FieldSource.manual));
+            onChanged(section.copyWith(fields: newFields));
+          },
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('Ajouter un champ',
+              style: TextStyle(fontSize: 12)),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Field row ─────────────────────────────────────────────────────────────────
 
 class _FieldRow extends StatefulWidget {
   final TemplateFieldConfig field;
@@ -584,8 +1172,18 @@ class _FieldRowState extends State<_FieldRow> {
   void initState() {
     super.initState();
     _labelCtrl = TextEditingController(text: widget.field.label ?? '');
-    _valueCtrl =
-        TextEditingController(text: widget.field.manualValue ?? '');
+    _valueCtrl = TextEditingController(text: widget.field.manualValue ?? '');
+  }
+
+  @override
+  void didUpdateWidget(_FieldRow old) {
+    super.didUpdateWidget(old);
+    if (widget.field.label != old.field.label) {
+      _labelCtrl.text = widget.field.label ?? '';
+    }
+    if (widget.field.manualValue != old.field.manualValue) {
+      _valueCtrl.text = widget.field.manualValue ?? '';
+    }
   }
 
   @override
@@ -608,7 +1206,8 @@ class _FieldRowState extends State<_FieldRow> {
             : Colors.grey[50],
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-            color: isDark ? Colors.grey.shade700 : Colors.grey.shade200),
+            color:
+                isDark ? Colors.grey.shade700 : Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -621,8 +1220,8 @@ class _FieldRowState extends State<_FieldRow> {
                   decoration: const InputDecoration(
                     labelText: 'Source',
                     isDense: true,
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
                     border: OutlineInputBorder(),
                   ),
                   items: FieldSource.values
@@ -650,7 +1249,6 @@ class _FieldRowState extends State<_FieldRow> {
             ],
           ),
           const SizedBox(height: 8),
-          // Label prefix
           TextFormField(
             controller: _labelCtrl,
             decoration: const InputDecoration(
@@ -662,8 +1260,8 @@ class _FieldRowState extends State<_FieldRow> {
               border: OutlineInputBorder(),
             ),
             style: const TextStyle(fontSize: 12),
-            onChanged: (v) =>
-                widget.onChanged(widget.field.copyWith(label: v.isEmpty ? null : v)),
+            onChanged: (v) => widget.onChanged(
+                widget.field.copyWith(label: v.isEmpty ? null : v)),
           ),
           if (isManual) ...[
             const SizedBox(height: 8),
@@ -677,8 +1275,8 @@ class _FieldRowState extends State<_FieldRow> {
                 border: OutlineInputBorder(),
               ),
               style: const TextStyle(fontSize: 12),
-              onChanged: (v) => widget.onChanged(
-                  widget.field.copyWith(manualValue: v.isEmpty ? null : v)),
+              onChanged: (v) => widget.onChanged(widget.field
+                  .copyWith(manualValue: v.isEmpty ? null : v)),
             ),
           ],
           const SizedBox(height: 8),
@@ -712,7 +1310,7 @@ class _FieldRowState extends State<_FieldRow> {
   }
 }
 
-// ── Sub-widgets ────────────────────────────────────────────────────────────────
+// ── Sub-widgets ───────────────────────────────────────────────────────────────
 
 class _CheckChip extends StatelessWidget {
   final String label;
@@ -720,7 +1318,9 @@ class _CheckChip extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   const _CheckChip(
-      {required this.label, required this.value, required this.onChanged});
+      {required this.label,
+      required this.value,
+      required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -738,20 +1338,33 @@ class _CheckChip extends StatelessWidget {
 
 class _AlignmentToggle extends StatelessWidget {
   final String value;
+  final Color accent;
   final ValueChanged<String> onChanged;
 
-  const _AlignmentToggle({required this.value, required this.onChanged});
+  const _AlignmentToggle(
+      {required this.value,
+      required this.accent,
+      required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _AlignBtn(icon: Icons.format_align_left, align: 'left',
-            selected: value == 'left', onTap: () => onChanged('left')),
-        _AlignBtn(icon: Icons.format_align_center, align: 'center',
-            selected: value == 'center', onTap: () => onChanged('center')),
-        _AlignBtn(icon: Icons.format_align_right, align: 'right',
-            selected: value == 'right', onTap: () => onChanged('right')),
+        _AlignBtn(
+            icon: Icons.format_align_left,
+            selected: value == 'left',
+            accent: accent,
+            onTap: () => onChanged('left')),
+        _AlignBtn(
+            icon: Icons.format_align_center,
+            selected: value == 'center',
+            accent: accent,
+            onTap: () => onChanged('center')),
+        _AlignBtn(
+            icon: Icons.format_align_right,
+            selected: value == 'right',
+            accent: accent,
+            onTap: () => onChanged('right')),
       ],
     );
   }
@@ -759,32 +1372,33 @@ class _AlignmentToggle extends StatelessWidget {
 
 class _AlignBtn extends StatelessWidget {
   final IconData icon;
-  final String align;
   final bool selected;
+  final Color accent;
   final VoidCallback onTap;
 
   const _AlignBtn({
     required this.icon,
-    required this.align,
     required this.selected,
+    required this.accent,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF1A73E8);
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
         margin: const EdgeInsets.only(right: 4),
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: selected ? blue.withOpacity(0.1) : Colors.transparent,
+          color: selected ? accent.withOpacity(0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-              color: selected ? blue : Colors.grey.shade300, width: 1),
+              color: selected ? accent : Colors.grey.shade300, width: 1),
         ),
-        child: Icon(icon, size: 14, color: selected ? blue : Colors.grey),
+        child:
+            Icon(icon, size: 14, color: selected ? accent : Colors.grey),
       ),
     );
   }
@@ -794,7 +1408,8 @@ class _LayoutPicker extends StatelessWidget {
   final TemplateLayout value;
   final ValueChanged<TemplateLayout> onChanged;
 
-  const _LayoutPicker({required this.value, required this.onChanged});
+  const _LayoutPicker(
+      {required this.value, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -808,7 +1423,8 @@ class _LayoutPicker extends StatelessWidget {
         DropdownMenuItem(
             value: TemplateLayout.modern, child: Text('Moderne')),
         DropdownMenuItem(
-            value: TemplateLayout.minimal, child: Text('Minimaliste')),
+            value: TemplateLayout.minimal,
+            child: Text('Minimaliste')),
         DropdownMenuItem(
             value: TemplateLayout.bold, child: Text('Audacieux')),
       ],
@@ -821,11 +1437,18 @@ class _TitlePicker extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
 
-  const _TitlePicker({required this.value, required this.onChanged});
+  const _TitlePicker(
+      {required this.value, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    const options = ['FACTURE', 'DEVIS', 'BON DE COMMANDE', 'PROFORMA', 'REÇU'];
+    const options = [
+      'FACTURE',
+      'DEVIS',
+      'BON DE COMMANDE',
+      'PROFORMA',
+      'REÇU'
+    ];
     return DropdownButton<String>(
       value: options.contains(value) ? value : 'FACTURE',
       underline: const SizedBox(),
@@ -838,7 +1461,7 @@ class _TitlePicker extends StatelessWidget {
   }
 }
 
-// ── Nullable color swatch (for field textColor / section backgroundColor) ─────
+// ── Nullable color swatch ─────────────────────────────────────────────────────
 
 class _NullableColorSwatch extends StatelessWidget {
   final int? value;
@@ -853,7 +1476,9 @@ class _NullableColorSwatch extends StatelessWidget {
   ];
 
   const _NullableColorSwatch(
-      {required this.value, required this.onChanged, this.label = ''});
+      {required this.value,
+      required this.onChanged,
+      this.label = ''});
 
   void _show(BuildContext context) {
     showDialog<void>(
@@ -864,36 +1489,33 @@ class _NullableColorSwatch extends StatelessWidget {
         contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
         content: SizedBox(
           width: 220,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: _palette.map((c) {
-                  final sel = c == value;
-                  return GestureDetector(
-                    onTap: () {
-                      onChanged(c);
-                      Navigator.pop(context);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: Color(c),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: sel ? const Color(0xFF1A73E8) : Colors.grey.shade300,
-                          width: sel ? 2.5 : 1,
-                        ),
-                      ),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _palette.map((c) {
+              final sel = c == value;
+              return GestureDetector(
+                onTap: () {
+                  onChanged(c);
+                  Navigator.pop(context);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Color(c),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: sel
+                          ? const Color(0xFF1A73E8)
+                          : Colors.grey.shade300,
+                      width: sel ? 2.5 : 1,
                     ),
-                  );
-                }).toList(),
-              ),
-            ],
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ),
         actions: [
@@ -926,7 +1548,9 @@ class _NullableColorSwatch extends StatelessWidget {
             width: 20,
             height: 20,
             decoration: BoxDecoration(
-              color: value != null ? Color(value!) : Colors.transparent,
+              color: value != null
+                  ? Color(value!)
+                  : Colors.transparent,
               shape: BoxShape.circle,
               border: Border.all(
                 color: value != null
@@ -936,14 +1560,15 @@ class _NullableColorSwatch extends StatelessWidget {
               ),
             ),
             child: value == null
-                ? const Icon(Icons.palette_outlined, size: 12,
-                    color: Color(0xFF9AA0A6))
+                ? const Icon(Icons.palette_outlined,
+                    size: 12, color: Color(0xFF9AA0A6))
                 : null,
           ),
           const SizedBox(width: 4),
           Text(
             value != null ? 'Couleur' : 'Défaut',
-            style: const TextStyle(fontSize: 11, color: Color(0xFF5F6368)),
+            style: const TextStyle(
+                fontSize: 11, color: Color(0xFF5F6368)),
           ),
         ],
       ),
@@ -955,7 +1580,8 @@ class _ColorPicker extends StatelessWidget {
   final int value;
   final ValueChanged<int> onChanged;
 
-  const _ColorPicker({required this.value, required this.onChanged});
+  const _ColorPicker(
+      {required this.value, required this.onChanged});
 
   static const _palette = [
     0xFF1A73E8, 0xFF00897B, 0xFF546E7A, 0xFF8B1A1A,
@@ -987,10 +1613,9 @@ class _ColorPicker extends StatelessWidget {
               boxShadow: selected
                   ? [
                       BoxShadow(
-                        color: Color(c).withOpacity(0.5),
-                        blurRadius: 4,
-                        spreadRadius: 1,
-                      )
+                          color: Color(c).withOpacity(0.5),
+                          blurRadius: 4,
+                          spreadRadius: 1)
                     ]
                   : [],
             ),
@@ -1001,7 +1626,7 @@ class _ColorPicker extends StatelessWidget {
   }
 }
 
-// ── Shared layout widgets ──────────────────────────────────────────────────────
+// ── Shared layout ─────────────────────────────────────────────────────────────
 
 class _Card extends StatelessWidget {
   final Widget child;
@@ -1026,6 +1651,29 @@ class _Card extends StatelessWidget {
   }
 }
 
+class _LabeledRow extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _LabeledRow({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w500, fontSize: 14)),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+}
 
 // ── Payment method check tile ─────────────────────────────────────────────────
 
@@ -1060,15 +1708,20 @@ class _PaymentMethodCheckTile extends StatelessWidget {
               child: method.type.assetPath != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(method.type.assetPath!, fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Icon(method.type.icon, size: 16, color: color)),
+                      child: Image.asset(method.type.assetPath!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(
+                              method.type.icon,
+                              size: 16,
+                              color: color)),
                     )
                   : Icon(method.type.icon, size: 16, color: color),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(method.label,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w500)),
             ),
             Checkbox(
               value: checked,
@@ -1114,15 +1767,18 @@ class _CustomTableEditorState extends State<_CustomTableEditor> {
   void _rebuild(TemplateCustomTable t) {
     _disposeAll();
     _hCtls.addAll(t.headers.map((h) => TextEditingController(text: h)));
-    _cCtls.addAll(
-      t.rows.map((row) => row.map((c) => TextEditingController(text: c)).toList()),
-    );
+    _cCtls.addAll(t.rows
+        .map((row) => row.map((c) => TextEditingController(text: c)).toList()));
   }
 
   void _disposeAll() {
-    for (final c in _hCtls) { c.dispose(); }
+    for (final c in _hCtls) {
+      c.dispose();
+    }
     for (final row in _cCtls) {
-      for (final c in row) { c.dispose(); }
+      for (final c in row) {
+        c.dispose();
+      }
     }
     _hCtls.clear();
     _cCtls.clear();
@@ -1140,27 +1796,24 @@ class _CustomTableEditorState extends State<_CustomTableEditor> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     const colW = 105.0;
     final tableW = colW * t.columnCount;
-    final divColor = isDark ? Colors.grey.shade700 : Colors.grey.shade300;
+    final divColor =
+        isDark ? Colors.grey.shade700 : Colors.grey.shade300;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Contrôles lignes / colonnes
         Row(
           children: [
-            _counter(context, 'Colonnes', t.columnCount, 1, 6,
-              () => widget.onChanged(t.removeLastColumn()),
-              () => widget.onChanged(t.addColumn()),
-            ),
+            _counter(context, 'Colonnes', t.columnCount, 1, 12,
+                () => widget.onChanged(t.removeLastColumn()),
+                () => widget.onChanged(t.addColumn())),
             const SizedBox(width: 20),
-            _counter(context, 'Lignes', t.rowCount, 1, 20,
-              () => widget.onChanged(t.removeLastRow()),
-              () => widget.onChanged(t.addRow()),
-            ),
+            _counter(context, 'Lignes', t.rowCount, 1, 100,
+                () => widget.onChanged(t.removeLastRow()),
+                () => widget.onChanged(t.addRow())),
           ],
         ),
         const SizedBox(height: 12),
-        // Tableau
         Container(
           decoration: BoxDecoration(
             border: Border.all(color: divColor),
@@ -1173,36 +1826,49 @@ class _CustomTableEditorState extends State<_CustomTableEditor> {
               width: tableW,
               child: Column(
                 children: [
-                  // En-tête
                   Container(
                     color: widget.accent,
                     child: Row(
-                      children: List.generate(t.columnCount, (col) => _cell(
-                        context, _hCtls[col],
-                        isHeader: true,
-                        showDivider: col < t.columnCount - 1,
-                        divColor: Colors.white.withOpacity(0.3),
-                        onChanged: (v) => widget.onChanged(t.updateHeader(col, v)),
-                      )),
+                      children: List.generate(
+                          t.columnCount,
+                          (col) => _cell(context, _hCtls[col],
+                              isHeader: true,
+                              showDivider: col < t.columnCount - 1,
+                              divColor:
+                                  Colors.white.withOpacity(0.3),
+                              onChanged: (v) => widget
+                                  .onChanged(t.updateHeader(col, v)))),
                     ),
                   ),
-                  // Lignes
-                  ...List.generate(t.rowCount, (row) => Container(
-                    decoration: BoxDecoration(
-                      color: row.isOdd
-                          ? (isDark ? Colors.grey.shade800 : Colors.grey.shade50)
-                          : (isDark ? const Color(0xFF1E2433) : Colors.white),
-                      border: Border(top: BorderSide(color: divColor, width: 0.5)),
-                    ),
-                    child: Row(
-                      children: List.generate(t.columnCount, (col) => _cell(
-                        context, _cCtls[row][col],
-                        showDivider: col < t.columnCount - 1,
-                        divColor: divColor,
-                        onChanged: (v) => widget.onChanged(t.updateCell(row, col, v)),
-                      )),
-                    ),
-                  )),
+                  ...List.generate(
+                      t.rowCount,
+                      (row) => Container(
+                            decoration: BoxDecoration(
+                              color: row.isOdd
+                                  ? (isDark
+                                      ? Colors.grey.shade800
+                                      : Colors.grey.shade50)
+                                  : (isDark
+                                      ? const Color(0xFF1E2433)
+                                      : Colors.white),
+                              border: Border(
+                                  top: BorderSide(
+                                      color: divColor, width: 0.5)),
+                            ),
+                            child: Row(
+                              children: List.generate(
+                                  t.columnCount,
+                                  (col) => _cell(
+                                      context, _cCtls[row][col],
+                                      showDivider:
+                                          col < t.columnCount - 1,
+                                      divColor: divColor,
+                                      onChanged: (v) =>
+                                          widget.onChanged(
+                                              t.updateCell(
+                                                  row, col, v)))),
+                            ),
+                          )),
                 ],
               ),
             ),
@@ -1212,18 +1878,21 @@ class _CustomTableEditorState extends State<_CustomTableEditor> {
     );
   }
 
-  Widget _counter(BuildContext context, String label, int value, int min, int max,
-      VoidCallback onDec, VoidCallback onInc) {
+  Widget _counter(BuildContext context, String label, int value,
+      int min, int max, VoidCallback onDec, VoidCallback onInc) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w500)),
         const SizedBox(width: 8),
         _btn(Icons.remove, value > min ? onDec : null),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Text('$value',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.bold)),
         ),
         _btn(Icons.add, value < max ? onInc : null),
       ],
@@ -1241,66 +1910,47 @@ class _CustomTableEditorState extends State<_CustomTableEditor> {
           color: onTap != null ? blue : Colors.grey.shade300,
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Icon(icon, size: 14,
-            color: onTap != null ? Colors.white : Colors.grey.shade500),
+        child: Icon(icon,
+            size: 14,
+            color: onTap != null
+                ? Colors.white
+                : Colors.grey.shade500),
       ),
     );
   }
 
-  Widget _cell(BuildContext context, TextEditingController ctl, {
-    bool isHeader = false,
-    bool showDivider = false,
-    Color divColor = const Color(0xFFE0E0E0),
-    ValueChanged<String>? onChanged,
-  }) {
+  Widget _cell(BuildContext context, TextEditingController ctl,
+      {bool isHeader = false,
+      bool showDivider = false,
+      Color divColor = const Color(0xFFE0E0E0),
+      ValueChanged<String>? onChanged}) {
     return Expanded(
       child: Container(
         decoration: showDivider
-            ? BoxDecoration(border: Border(right: BorderSide(color: divColor, width: 0.5)))
+            ? BoxDecoration(
+                border: Border(
+                    right: BorderSide(color: divColor, width: 0.5)))
             : null,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         child: TextField(
           controller: ctl,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+            fontWeight:
+                isHeader ? FontWeight.bold : FontWeight.normal,
             color: isHeader ? Colors.white : null,
           ),
           decoration: const InputDecoration(
             isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 0, vertical: 6),
+            contentPadding:
+                EdgeInsets.symmetric(horizontal: 0, vertical: 6),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
           ),
           onChanged: onChanged,
         ),
-      ),
-    );
-  }
-}
-
-// ── Labeled row ───────────────────────────────────────────────────────────────
-
-class _LabeledRow extends StatelessWidget {
-  final String label;
-  final Widget child;
-
-  const _LabeledRow({required this.label, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(label,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w500, fontSize: 14)),
-          ),
-          child,
-        ],
       ),
     );
   }

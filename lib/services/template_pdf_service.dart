@@ -67,9 +67,10 @@ class TemplatePdfService {
 
     final pdf = pw.Document();
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.symmetric(horizontal: 40, vertical: 36),
+        footer: (_) => _footer(ctx),
         build: (_) => switch (template.layout) {
           TemplateLayout.classic => _buildClassic(ctx),
           TemplateLayout.modern => _buildModern(ctx),
@@ -83,21 +84,19 @@ class TemplatePdfService {
 
   // ── Layout: Classic ───────────────────────────────────────────────────────
 
-  static pw.Widget _buildClassic(_RenderCtx c) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        if (!c.template.topCenter.isEmpty) ...[
-          _renderSection(c.template.topCenter, c, fullWidth: true),
-          pw.SizedBox(height: 10),
-        ],
-        // ── En-tête : fond accent léger + badge + numéro de facture ──────────
-        pw.Container(
-          padding: const pw.EdgeInsets.all(14),
-          decoration: pw.BoxDecoration(
-            color: PdfColor(c.accent.red, c.accent.green, c.accent.blue, 0.07),
-            borderRadius: pw.BorderRadius.circular(6),
-          ),
+  static List<pw.Widget> _buildClassic(_RenderCtx c) {
+    return [
+      if (!c.template.topCenter.isEmpty) ...[
+        _renderSection(c.template.topCenter, c, fullWidth: true),
+        pw.SizedBox(height: 10),
+      ],
+      // ── En-tête : fond accent léger + badge + numéro de facture ──────────
+      pw.Container(
+        padding: const pw.EdgeInsets.all(14),
+        decoration: pw.BoxDecoration(
+          color: PdfColor(c.accent.red, c.accent.green, c.accent.blue, 0.07),
+          borderRadius: pw.BorderRadius.circular(6),
+        ),
           child: pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
@@ -226,18 +225,13 @@ class TemplatePdfService {
             ],
           ),
         ],
-        pw.Spacer(),
-        _footer(c),
-      ],
-    );
+    ];
   }
 
   // ── Layout: Modern ────────────────────────────────────────────────────────
 
-  static pw.Widget _buildModern(_RenderCtx c) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
+  static List<pw.Widget> _buildModern(_RenderCtx c) {
+    return [
         // Full-width colored header
         pw.Container(
           width: double.infinity,
@@ -358,18 +352,13 @@ class TemplatePdfService {
           pw.SizedBox(height: 14),
           _paymentsTable(c),
         ],
-        pw.Spacer(),
-        _footer(c),
-      ],
-    );
+    ];
   }
 
   // ── Layout: Minimal ───────────────────────────────────────────────────────
 
-  static pw.Widget _buildMinimal(_RenderCtx c) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
+  static List<pw.Widget> _buildMinimal(_RenderCtx c) {
+    return [
         // Header: company left, title right
         pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -499,18 +488,13 @@ class TemplatePdfService {
           pw.SizedBox(height: 14),
           _paymentsTable(c),
         ],
-        pw.Spacer(),
-        _footer(c),
-      ],
-    );
+    ];
   }
 
   // ── Layout: Bold ──────────────────────────────────────────────────────────
 
-  static pw.Widget _buildBold(_RenderCtx c) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
+  static List<pw.Widget> _buildBold(_RenderCtx c) {
+    return [
         // Bold banner
         pw.Container(
           width: double.infinity,
@@ -649,10 +633,7 @@ class TemplatePdfService {
           pw.SizedBox(height: 14),
           _paymentsTable(c),
         ],
-        pw.Spacer(),
-        _footer(c),
-      ],
-    );
+    ];
   }
 
   // ── Shared building blocks ─────────────────────────────────────────────────
@@ -896,7 +877,7 @@ class TemplatePdfService {
           children: [
             pw.TableRow(
               decoration: pw.BoxDecoration(color: c.accent),
-              children: ['Désignation', 'Qté', 'PU (FCFA)', 'Total (FCFA)']
+              children: ['Désignation', 'Qté', 'PU (${CurrencyFormatter.symbol})', 'Total (${CurrencyFormatter.symbol})']
                   .map((h) => _tCell(h, header: true, textColor: PdfColors.white))
                   .toList(),
             ),
@@ -1184,33 +1165,6 @@ class TemplatePdfService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        if (profile.bankName.isNotEmpty || profile.bankAccount.isNotEmpty)
-          pw.Container(
-            margin: const pw.EdgeInsets.only(bottom: 8),
-            padding:
-                const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: pw.BoxDecoration(
-              color: PdfColor(
-                  c.accent.red, c.accent.green, c.accent.blue, 0.07),
-              borderRadius: pw.BorderRadius.circular(5),
-            ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.center,
-              children: [
-                pw.Text('Coordonnées bancaires : ',
-                    style:
-                        const pw.TextStyle(fontSize: 9, color: _kTextGrey)),
-                if (profile.bankName.isNotEmpty)
-                  pw.Text('${profile.bankName}  ',
-                      style: pw.TextStyle(
-                          fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                if (profile.bankAccount.isNotEmpty)
-                  pw.Text(profile.bankAccount,
-                      style: pw.TextStyle(
-                          fontSize: 9, fontWeight: pw.FontWeight.bold)),
-              ],
-            ),
-          ),
         pw.Divider(color: _kDivider, thickness: 0.5),
         pw.SizedBox(height: 4),
         if (!section.isEmpty)

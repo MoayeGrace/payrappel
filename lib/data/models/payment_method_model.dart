@@ -11,6 +11,7 @@ enum PaymentMethodType {
   mastercard,
   stripe,
   paypal,
+  bankTransfer,
   custom,
 }
 
@@ -26,6 +27,7 @@ extension PaymentMethodTypeExt on PaymentMethodType {
       case PaymentMethodType.mastercard:   return 'mastercard';
       case PaymentMethodType.stripe:       return 'stripe';
       case PaymentMethodType.paypal:       return 'paypal';
+      case PaymentMethodType.bankTransfer: return 'bank_transfer';
       case PaymentMethodType.custom:       return 'custom';
     }
   }
@@ -41,6 +43,7 @@ extension PaymentMethodTypeExt on PaymentMethodType {
       case PaymentMethodType.mastercard:   return 'Mastercard';
       case PaymentMethodType.stripe:       return 'Stripe';
       case PaymentMethodType.paypal:       return 'PayPal';
+      case PaymentMethodType.bankTransfer: return 'Virement bancaire';
       case PaymentMethodType.custom:       return 'Autre';
     }
   }
@@ -56,6 +59,7 @@ extension PaymentMethodTypeExt on PaymentMethodType {
       case PaymentMethodType.mastercard:   return const Color(0xFFEB001B);
       case PaymentMethodType.stripe:       return const Color(0xFF635BFF);
       case PaymentMethodType.paypal:       return const Color(0xFF003087);
+      case PaymentMethodType.bankTransfer: return const Color(0xFF1565C0);
       case PaymentMethodType.custom:       return const Color(0xFF607D8B);
     }
   }
@@ -69,9 +73,10 @@ extension PaymentMethodTypeExt on PaymentMethodType {
       case PaymentMethodType.djamo:        return 'assets/Djamo-Logo.png';
       case PaymentMethodType.stripe:       return 'assets/stripe.png';
       case PaymentMethodType.paypal:       return 'assets/paypal.png';
-      case PaymentMethodType.visa:        return 'assets/VISA.png';
-      case PaymentMethodType.mastercard:  return 'assets/MASTERCARD.webp';
-      case PaymentMethodType.custom:      return null;
+      case PaymentMethodType.visa:         return 'assets/VISA.png';
+      case PaymentMethodType.mastercard:   return 'assets/MASTERCARD.webp';
+      case PaymentMethodType.bankTransfer: return null;
+      case PaymentMethodType.custom:       return null;
     }
   }
 
@@ -89,6 +94,8 @@ extension PaymentMethodTypeExt on PaymentMethodType {
       case PaymentMethodType.stripe:
       case PaymentMethodType.paypal:
         return Icons.language_outlined;
+      case PaymentMethodType.bankTransfer:
+        return Icons.account_balance_outlined;
       case PaymentMethodType.custom:
         return Icons.account_balance_wallet_outlined;
     }
@@ -123,6 +130,15 @@ extension PaymentMethodTypeExt on PaymentMethodType {
         return const [
           PaymentFieldDef('paypalEmail', 'Email ou lien PayPal',
               'moncompte@paypal.com', TextInputType.emailAddress),
+        ];
+      case PaymentMethodType.bankTransfer:
+        return const [
+          PaymentFieldDef('bankName', 'Nom de la banque', 'Ecobank, BICICI…',
+              TextInputType.text),
+          PaymentFieldDef('accountNumber', 'Numéro de compte / IBAN',
+              'CI 12 3456 7890 1234 5678', TextInputType.text),
+          PaymentFieldDef('bic', 'Code BIC / SWIFT (optionnel)', 'ECOCCIAB',
+              TextInputType.text),
         ];
       case PaymentMethodType.custom:
         return const [];

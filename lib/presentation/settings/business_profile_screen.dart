@@ -25,12 +25,24 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
   late TextEditingController _phoneCtrl;
   late TextEditingController _emailCtrl;
   late TextEditingController _rccmCtrl;
-  late TextEditingController _bankNameCtrl;
-  late TextEditingController _bankAccountCtrl;
   late TextEditingController _footerCtrl;
 
   String? _logoPath;
+  String _currency = 'FCFA';
   bool _saving = false;
+
+  static const _currencies = [
+    ('FCFA', 'Franc CFA (FCFA)'),
+    ('XAF', 'Franc CFA BEAC (XAF)'),
+    ('EUR', 'Euro (€)'),
+    ('USD', 'Dollar américain (\$)'),
+    ('GBP', 'Livre sterling (£)'),
+    ('NGN', 'Naira nigérian (₦)'),
+    ('GHS', 'Cedi ghanéen (₵)'),
+    ('MAD', 'Dirham marocain (MAD)'),
+    ('GNF', 'Franc guinéen (GNF)'),
+    ('CDF', 'Franc congolais (CDF)'),
+  ];
 
   @override
   void initState() {
@@ -42,10 +54,9 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
     _phoneCtrl = TextEditingController(text: p.phone);
     _emailCtrl = TextEditingController(text: p.email);
     _rccmCtrl = TextEditingController(text: p.rccm);
-    _bankNameCtrl = TextEditingController(text: p.bankName);
-    _bankAccountCtrl = TextEditingController(text: p.bankAccount);
     _footerCtrl = TextEditingController(text: p.footerText);
     _logoPath = p.logoPath;
+    _currency = p.currency.isNotEmpty ? p.currency : 'FCFA';
   }
 
   @override
@@ -56,8 +67,6 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
     _rccmCtrl.dispose();
-    _bankNameCtrl.dispose();
-    _bankAccountCtrl.dispose();
     _footerCtrl.dispose();
     super.dispose();
   }
@@ -89,10 +98,9 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
         phone: _phoneCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         rccm: _rccmCtrl.text.trim(),
-        bankName: _bankNameCtrl.text.trim(),
-        bankAccount: _bankAccountCtrl.text.trim(),
         footerText: _footerCtrl.text.trim(),
         logoPath: _logoPath,
+        currency: _currency,
       );
       await context.read<BusinessProfileProvider>().save(profile);
       if (mounted) {
@@ -287,23 +295,70 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
 
             const SizedBox(height: 20),
 
-            // ── Informations bancaires ───────────────────────────────────────
-            const _SectionLabel('Coordonnées bancaires (optionnel)'),
-            _FormCard(
-              children: [
-                _Field(
-                  controller: _bankNameCtrl,
-                  label: 'Nom de la banque',
-                  icon: Icons.account_balance_outlined,
-                  capitalization: TextCapitalization.words,
+            // ── Devise ───────────────────────────────────────────────────────
+            const _SectionLabel('Devise'),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: DropdownButtonFormField<String>(
+                  value: _currencies.any((c) => c.$1 == _currency)
+                      ? _currency
+                      : 'FCFA',
+                  decoration: InputDecoration(
+                    labelText: 'Devise utilisée dans vos factures',
+                    prefixIcon: const Icon(Icons.monetization_on_outlined,
+                        color: _teal, size: 20),
+                    filled: true,
+                    fillColor:
+                        Theme.of(context).colorScheme.surfaceContainerLow,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey[200]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey[200]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: _blue, width: 1.5),
+                    ),
+                    labelStyle:
+                        TextStyle(color: Colors.grey[600], fontSize: 13),
+                  ),
+                  items: _currencies
+                      .map((c) => DropdownMenuItem(
+                            value: c.$1,
+                            child: Text(c.$2),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setState(() => _currency = v ?? 'FCFA'),
                 ),
-                _Field(
-                  controller: _bankAccountCtrl,
-                  label: 'Numéro de compte',
-                  icon: Icons.credit_card_outlined,
-                  isLast: true,
-                ),
-              ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Les coordonnées bancaires se configurent dans Moyens de paiement (type Virement bancaire).',
+                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+              ),
             ),
 
             const SizedBox(height: 20),

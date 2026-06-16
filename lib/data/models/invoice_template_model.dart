@@ -2,6 +2,17 @@
 
 enum TemplateLayout { classic, modern, minimal, bold }
 
+/// Identifie chacune des sections éditables d'un template.
+enum TemplateSectionId {
+  topLeft,
+  topRight,
+  bottomCenter,
+  // Conservés pour compatibilité ascendante, non affichés dans l'UI :
+  topCenter,
+  bottomLeft,
+  bottomRight,
+}
+
 enum FieldSource {
   companyName,
   companyAddress,
@@ -210,7 +221,7 @@ class TemplateCustomTable {
   }
 
   TemplateCustomTable addColumn() {
-    if (columnCount >= 6) return this;
+    if (columnCount >= 12) return this;
     return copyWith(
       headers: [...headers, 'Col. ${columnCount + 1}'],
       rows: rows.map((r) => [...r, '']).toList(),
@@ -226,7 +237,7 @@ class TemplateCustomTable {
   }
 
   TemplateCustomTable addRow() {
-    if (rowCount >= 20) return this;
+    if (rowCount >= 100) return this;
     return copyWith(rows: [...rows, List.filled(columnCount, '')]);
   }
 
@@ -407,7 +418,6 @@ const _sectionClient = TemplateSectionModel(
 const _sectionFooter = TemplateSectionModel(
   alignment: 'center',
   fields: [
-    TemplateFieldConfig(source: FieldSource.bankInfo),
     TemplateFieldConfig(
         source: FieldSource.manual,
         manualValue: 'Merci pour votre confiance.'),
@@ -663,6 +673,234 @@ class BuiltInTemplates {
       layout: TemplateLayout.classic,
       showPaymentMethods: true,
       topCenter: _sectionEmpty,
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // ── 12 nouveaux templates ─────────────────────────────────────────────────
+
+    // 16 — Studio Navy Gold
+    InvoiceTemplateModel(
+      id: 'builtin_modern_navy_gold',
+      name: 'Studio Navy Gold',
+      isBuiltIn: true,
+      accentColor: 0xFFF59E0B,
+      headerBgColor: 0xFF1A237E,
+      layout: TemplateLayout.modern,
+      showPaymentMethods: true,
+      topCenter: _sectionEmpty,
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 17 — Charbon Jaune
+    InvoiceTemplateModel(
+      id: 'builtin_bold_charcoal_yellow',
+      name: 'Charbon Jaune',
+      isBuiltIn: true,
+      accentColor: 0xFFFFD600,
+      headerBgColor: 0xFF212121,
+      layout: TemplateLayout.bold,
+      showPaymentMethods: true,
+      topCenter: TemplateSectionModel(
+        alignment: 'center',
+        fields: [
+          TemplateFieldConfig(
+              source: FieldSource.manual,
+              manualValue: 'FACTURE',
+              bold: true,
+              large: true),
+        ],
+      ),
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 18 — Signature Noir
+    InvoiceTemplateModel(
+      id: 'builtin_minimal_black',
+      name: 'Signature Noir',
+      isBuiltIn: true,
+      accentColor: 0xFF111111,
+      layout: TemplateLayout.minimal,
+      showPaymentMethods: false,
+      topCenter: _sectionEmpty,
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 19 — Corail Créatif
+    InvoiceTemplateModel(
+      id: 'builtin_classic_coral',
+      name: 'Corail Créatif',
+      isBuiltIn: true,
+      accentColor: 0xFFE91E63,
+      layout: TemplateLayout.classic,
+      showPaymentMethods: true,
+      topCenter: _sectionEmpty,
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 20 — Impact Royal
+    InvoiceTemplateModel(
+      id: 'builtin_bold_royal_purple',
+      name: 'Impact Royal',
+      isBuiltIn: true,
+      accentColor: 0xFF9C27B0,
+      headerBgColor: 0xFF4A148C,
+      layout: TemplateLayout.bold,
+      showPaymentMethods: true,
+      topCenter: TemplateSectionModel(
+        alignment: 'center',
+        fields: [
+          TemplateFieldConfig(
+              source: FieldSource.manual,
+              manualValue: 'FACTURE OFFICIELLE',
+              bold: true,
+              large: true),
+        ],
+      ),
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 21 — Saumon Studio
+    InvoiceTemplateModel(
+      id: 'builtin_modern_salmon',
+      name: 'Saumon Studio',
+      isBuiltIn: true,
+      accentColor: 0xFFFF6B6B,
+      headerBgColor: 0xFFD84315,
+      layout: TemplateLayout.modern,
+      showPaymentMethods: false,
+      topCenter: _sectionEmpty,
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 22 — Vert Sauge
+    InvoiceTemplateModel(
+      id: 'builtin_minimal_sage',
+      name: 'Vert Sauge',
+      isBuiltIn: true,
+      accentColor: 0xFF558B2F,
+      layout: TemplateLayout.minimal,
+      showPaymentMethods: false,
+      topCenter: _sectionEmpty,
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 23 — Acier Pro
+    InvoiceTemplateModel(
+      id: 'builtin_classic_steel',
+      name: 'Acier Pro',
+      isBuiltIn: true,
+      accentColor: 0xFF455A64,
+      layout: TemplateLayout.classic,
+      showPaymentMethods: true,
+      topCenter: _sectionEmpty,
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 24 — Impact Nuit
+    InvoiceTemplateModel(
+      id: 'builtin_bold_midnight',
+      name: 'Impact Nuit',
+      isBuiltIn: true,
+      accentColor: 0xFF3B82F6,
+      headerBgColor: 0xFF0A0E2A,
+      layout: TemplateLayout.bold,
+      showPaymentMethods: true,
+      topCenter: _sectionEmpty,
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 25 — Cuivre Luxe
+    InvoiceTemplateModel(
+      id: 'builtin_modern_copper',
+      name: 'Cuivre Luxe',
+      isBuiltIn: true,
+      accentColor: 0xFFBF8E3D,
+      headerBgColor: 0xFF3E2000,
+      layout: TemplateLayout.modern,
+      showPaymentMethods: true,
+      topCenter: _sectionEmpty,
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 26 — Tech Ciel
+    InvoiceTemplateModel(
+      id: 'builtin_classic_skyblue',
+      name: 'Tech Ciel',
+      isBuiltIn: true,
+      accentColor: 0xFF0288D1,
+      layout: TemplateLayout.classic,
+      showPaymentMethods: false,
+      topCenter: _sectionEmpty,
+      topLeft: _sectionCompany,
+      topRight: _sectionInvoiceMeta,
+      bottomLeft: _sectionClient,
+      bottomRight: _sectionEmpty,
+      bottomCenter: _sectionFooter,
+    ),
+
+    // 27 — Canary Dark
+    InvoiceTemplateModel(
+      id: 'builtin_bold_canary',
+      name: 'Canary Dark',
+      isBuiltIn: true,
+      accentColor: 0xFFFFEA00,
+      headerBgColor: 0xFF1A1A1A,
+      layout: TemplateLayout.bold,
+      showPaymentMethods: false,
+      topCenter: TemplateSectionModel(
+        alignment: 'center',
+        fields: [
+          TemplateFieldConfig(
+              source: FieldSource.manual,
+              manualValue: 'FACTURE',
+              bold: true,
+              large: true),
+        ],
+      ),
       topLeft: _sectionCompany,
       topRight: _sectionInvoiceMeta,
       bottomLeft: _sectionClient,
