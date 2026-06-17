@@ -992,7 +992,7 @@ class TemplatePdfService {
       child: pw.Row(
         children: [
           pw.Expanded(
-              child: _amountTile('Montant total',
+              child: _amountTile('Montant total TTC',
                   CurrencyFormatter.format(inv.totalAmount), _kTextDark)),
           _vDivider(),
           pw.Expanded(

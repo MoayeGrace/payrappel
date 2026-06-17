@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -24,6 +26,8 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
   late final TabController _tabCtrl;
   TemplateSectionId? _selectedSection;
   bool _saving = false;
+  int? _selectedFieldIndex;
+  Timer? _debounceTimer;
 
   static const _blue = Color(0xFF1A73E8);
 
@@ -36,6 +40,14 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
         id: TemplateSectionId.topRight,
         label: 'En-tête D.',
         icon: Icons.receipt_long_outlined),
+    _SectionMeta(
+        id: TemplateSectionId.bottomLeft,
+        label: 'Client',
+        icon: Icons.person_outline),
+    _SectionMeta(
+        id: TemplateSectionId.bottomRight,
+        label: 'Champs libres',
+        icon: Icons.edit_note_outlined),
     _SectionMeta(
         id: TemplateSectionId.bottomCenter,
         label: 'Pied de page',
@@ -53,6 +65,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _nameCtrl.dispose();
     _tabCtrl.dispose();
     super.dispose();
@@ -85,69 +98,53 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
   void _onSectionTap(TemplateSectionId? id) {
     setState(() {
       _selectedSection = id;
+      _selectedFieldIndex = null;
       if (id != null) _tabCtrl.animateTo(2);
     });
   }
 
   void _onInlineFieldTap(
       TemplateSectionId sectionId, int fieldIndex, TemplateFieldConfig field) {
-    _onSectionTap(sectionId);
-    if (field.source != FieldSource.manual) return;
-
-    final ctrl = TextEditingController(text: field.manualValue ?? '');
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Modifier le texte', style: TextStyle(fontSize: 15)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Entrez votre texte…',
-            border: OutlineInputBorder(),
-            isDense: true,
-            contentPadding:
-                EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          ),
-          style: const TextStyle(fontSize: 14),
-          onSubmitted: (_) =>
-              _saveInlineEdit(ctx, sectionId, fieldIndex, field, ctrl),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                _saveInlineEdit(ctx, sectionId, fieldIndex, field, ctrl),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    setState(() {
+      _selectedSection = sectionId;
+      _selectedFieldIndex = fieldIndex;
+    });
+    _tabCtrl.animateTo(2);
   }
 
-  void _saveInlineEdit(
-    BuildContext ctx,
-    TemplateSectionId sectionId,
-    int fieldIndex,
-    TemplateFieldConfig field,
-    TextEditingController ctrl,
-  ) {
-    final newVal = ctrl.text.trim();
+  void _onAddField(TemplateSectionId sectionId) {
     final section = _getSection(sectionId);
-    final newFields = List<TemplateFieldConfig>.from(section.fields);
-    newFields[fieldIndex] =
-        field.copyWith(manualValue: newVal.isEmpty ? null : newVal);
-    setState(
-        () => _template = _setSection(sectionId, section.copyWith(fields: newFields)));
-    Navigator.pop(ctx);
+    final newFields = List<TemplateFieldConfig>.from(section.fields)
+      ..add(const TemplateFieldConfig(source: FieldSource.manual));
+    setState(() {
+      _template = _setSection(sectionId, section.copyWith(fields: newFields));
+      _selectedSection = sectionId;
+      _tabCtrl.animateTo(2);
+    });
+    _debouncedAutoSave();
+  }
+
+  // Auto-sauvegarde avec debounce 500 ms, uniquement pour les templates custom.
+  void _debouncedAutoSave() {
+    if (_template.isBuiltIn) return;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      if (!mounted) return;
+      final name = _nameCtrl.text.trim();
+      if (name.isEmpty) return;
+      try {
+        await context
+            .read<InvoiceTemplateProvider>()
+            .saveCustomTemplate(_template.copyWith(name: name));
+      } catch (_) {}
+    });
   }
 
   TemplateSectionModel _getSection(TemplateSectionId id) => switch (id) {
         TemplateSectionId.topLeft => _template.topLeft,
         TemplateSectionId.topRight => _template.topRight,
+        TemplateSectionId.bottomLeft => _template.bottomLeft,
+        TemplateSectionId.bottomRight => _template.bottomRight,
         TemplateSectionId.bottomCenter => _template.bottomCenter,
         _ => _template.topLeft,
       };
@@ -157,9 +154,25 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
       switch (id) {
         TemplateSectionId.topLeft => _template.copyWith(topLeft: s),
         TemplateSectionId.topRight => _template.copyWith(topRight: s),
+        TemplateSectionId.bottomLeft => _template.copyWith(bottomLeft: s),
+        TemplateSectionId.bottomRight => _template.copyWith(bottomRight: s),
         TemplateSectionId.bottomCenter => _template.copyWith(bottomCenter: s),
         _ => _template,
       };
+
+  void _onTableTap() => _tabCtrl.animateTo(3);
+  void _onPaymentTap() => _tabCtrl.animateTo(4);
+
+  void _swapSections(TemplateSectionId from, TemplateSectionId to) {
+    if (from == to) return;
+    final a = _getSection(from);
+    final b = _getSection(to);
+    setState(() {
+      _template = _setSection(from, b);
+      _template = _setSection(to, a);
+    });
+    _debouncedAutoSave();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -204,7 +217,11 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
                                   selectedSection: _selectedSection,
                                   onSectionTap: _onSectionTap,
                                   onFieldTap: _onInlineFieldTap,
+                                  onAddField: _onAddField,
+                                  onSectionSwap: _swapSections,
                                   paymentMethods: paymentMethods,
+                                  onTableTap: _onTableTap,
+                                  onPaymentTap: _onPaymentTap,
                                 ),
                               ),
                             ),
@@ -355,12 +372,14 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
   // ── Section chips (sous le document) ─────────────────────────────────────────
 
   Widget _buildSectionChips(Color accent) {
-    return Container(
+    return SizedBox(
       height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: _sectionsMeta.map((meta) {
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: _sectionsMeta.map((meta) {
           final isSelected = _selectedSection == meta.id;
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 3),
@@ -412,6 +431,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
             ),
           );
         }).toList(),
+        ),
       ),
     );
   }
@@ -421,8 +441,12 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
   Widget _buildQuickToolbar(Color accent) {
     if (_selectedSection == null) return const SizedBox.shrink();
     final section = _getSection(_selectedSection!);
-    final meta =
-        _sectionsMeta.firstWhere((m) => m.id == _selectedSection);
+    final meta = _sectionsMeta.firstWhere(
+        (m) => m.id == _selectedSection,
+        orElse: () => _SectionMeta(
+            id: _selectedSection!,
+            label: _selectedSection!.name,
+            icon: Icons.view_column_outlined));
 
     return Container(
       color: Colors.grey[100],
@@ -709,8 +733,12 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
       );
     }
 
-    final meta =
-        _sectionsMeta.firstWhere((m) => m.id == _selectedSection);
+    final meta = _sectionsMeta.firstWhere(
+        (m) => m.id == _selectedSection,
+        orElse: () => _SectionMeta(
+            id: _selectedSection!,
+            label: _selectedSection!.name,
+            icon: Icons.view_column_outlined));
     final section = _getSection(_selectedSection!);
 
     return Column(
@@ -737,11 +765,16 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
         ),
         Expanded(
           child: _FieldsEditor(
+            key: ValueKey(_selectedSection),
             section: section,
             accent: accent,
             shrinkWrap: false,
-            onChanged: (updated) => setState(
-                () => _template = _setSection(_selectedSection!, updated)),
+            selectedFieldIndex: _selectedFieldIndex,
+            onChanged: (updated) {
+              setState(
+                  () => _template = _setSection(_selectedSection!, updated));
+              _debouncedAutoSave();
+            },
           ),
         ),
       ],
@@ -1068,25 +1101,80 @@ class _SectionEditorState extends State<_SectionEditor> {
 
 // ── Fields editor ─────────────────────────────────────────────────────────────
 
-class _FieldsEditor extends StatelessWidget {
+class _FieldsEditor extends StatefulWidget {
   final TemplateSectionModel section;
   final Color accent;
   final ValueChanged<TemplateSectionModel> onChanged;
   final bool shrinkWrap;
+  final int? selectedFieldIndex;
 
   const _FieldsEditor({
+    super.key,
     required this.section,
     required this.accent,
     required this.onChanged,
     this.shrinkWrap = false,
+    this.selectedFieldIndex,
   });
 
   @override
+  State<_FieldsEditor> createState() => _FieldsEditorState();
+}
+
+class _FieldsEditorState extends State<_FieldsEditor> {
+  final List<GlobalKey> _fieldKeys = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureKeys();
+    if (widget.selectedFieldIndex != null) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _scrollToSelected());
+    }
+  }
+
+  @override
+  void didUpdateWidget(_FieldsEditor old) {
+    super.didUpdateWidget(old);
+    _ensureKeys();
+    if (widget.selectedFieldIndex != null &&
+        widget.selectedFieldIndex != old.selectedFieldIndex) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _scrollToSelected());
+    }
+  }
+
+  void _ensureKeys() {
+    while (_fieldKeys.length < widget.section.fields.length) {
+      _fieldKeys.add(GlobalKey());
+    }
+    if (_fieldKeys.length > widget.section.fields.length) {
+      _fieldKeys.length = widget.section.fields.length;
+    }
+  }
+
+  void _scrollToSelected() {
+    final idx = widget.selectedFieldIndex;
+    if (idx == null || idx >= _fieldKeys.length) return;
+    final ctx = _fieldKeys[idx].currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(ctx,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+          alignment: 0.2);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final section = widget.section;
+    final accent = widget.accent;
     return ListView(
       padding: const EdgeInsets.all(12),
-      shrinkWrap: shrinkWrap,
-      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+      shrinkWrap: widget.shrinkWrap,
+      physics:
+          widget.shrinkWrap ? const NeverScrollableScrollPhysics() : null,
       children: [
         Row(
           children: [
@@ -1099,13 +1187,14 @@ class _FieldsEditor extends StatelessWidget {
             _AlignmentToggle(
               value: section.alignment,
               accent: accent,
-              onChanged: (a) => onChanged(section.copyWith(alignment: a)),
+              onChanged: (a) =>
+                  widget.onChanged(section.copyWith(alignment: a)),
             ),
             const Spacer(),
             _NullableColorSwatch(
               label: 'Couleur de fond',
               value: section.backgroundColor,
-              onChanged: (v) => onChanged(section.copyWith(
+              onChanged: (v) => widget.onChanged(section.copyWith(
                   backgroundColor: v, clearBgColor: v == null)),
             ),
           ],
@@ -1115,18 +1204,21 @@ class _FieldsEditor extends StatelessWidget {
           final i = entry.key;
           final field = entry.value;
           return _FieldRow(
+            key: _fieldKeys[i],
             field: field,
+            accent: accent,
+            isSelected: i == widget.selectedFieldIndex,
             onChanged: (updated) {
               final newFields =
                   List<TemplateFieldConfig>.from(section.fields);
               newFields[i] = updated;
-              onChanged(section.copyWith(fields: newFields));
+              widget.onChanged(section.copyWith(fields: newFields));
             },
             onDelete: () {
               final newFields =
                   List<TemplateFieldConfig>.from(section.fields)
                     ..removeAt(i);
-              onChanged(section.copyWith(fields: newFields));
+              widget.onChanged(section.copyWith(fields: newFields));
             },
           );
         }),
@@ -1136,7 +1228,7 @@ class _FieldsEditor extends StatelessWidget {
                 List<TemplateFieldConfig>.from(section.fields)
                   ..add(const TemplateFieldConfig(
                       source: FieldSource.manual));
-            onChanged(section.copyWith(fields: newFields));
+            widget.onChanged(section.copyWith(fields: newFields));
           },
           icon: const Icon(Icons.add, size: 16),
           label: const Text('Ajouter un champ',
@@ -1153,11 +1245,16 @@ class _FieldRow extends StatefulWidget {
   final TemplateFieldConfig field;
   final ValueChanged<TemplateFieldConfig> onChanged;
   final VoidCallback onDelete;
+  final bool isSelected;
+  final Color accent;
 
   const _FieldRow({
+    super.key,
     required this.field,
     required this.onChanged,
     required this.onDelete,
+    this.isSelected = false,
+    this.accent = const Color(0xFF1A73E8),
   });
 
   @override
@@ -1167,21 +1264,27 @@ class _FieldRow extends StatefulWidget {
 class _FieldRowState extends State<_FieldRow> {
   late TextEditingController _labelCtrl;
   late TextEditingController _valueCtrl;
+  late FocusNode _labelFocus;
+  late FocusNode _valueFocus;
 
   @override
   void initState() {
     super.initState();
     _labelCtrl = TextEditingController(text: widget.field.label ?? '');
     _valueCtrl = TextEditingController(text: widget.field.manualValue ?? '');
+    _labelFocus = FocusNode();
+    _valueFocus = FocusNode();
   }
 
   @override
   void didUpdateWidget(_FieldRow old) {
     super.didUpdateWidget(old);
-    if (widget.field.label != old.field.label) {
+    // Only sync from outside when the user is NOT actively typing in that field
+    if (!_labelFocus.hasFocus && widget.field.label != old.field.label) {
       _labelCtrl.text = widget.field.label ?? '';
     }
-    if (widget.field.manualValue != old.field.manualValue) {
+    if (!_valueFocus.hasFocus &&
+        widget.field.manualValue != old.field.manualValue) {
       _valueCtrl.text = widget.field.manualValue ?? '';
     }
   }
@@ -1190,6 +1293,8 @@ class _FieldRowState extends State<_FieldRow> {
   void dispose() {
     _labelCtrl.dispose();
     _valueCtrl.dispose();
+    _labelFocus.dispose();
+    _valueFocus.dispose();
     super.dispose();
   }
 
@@ -1206,8 +1311,11 @@ class _FieldRowState extends State<_FieldRow> {
             : Colors.grey[50],
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-            color:
-                isDark ? Colors.grey.shade700 : Colors.grey.shade200),
+          color: widget.isSelected
+              ? widget.accent
+              : (isDark ? Colors.grey.shade700 : Colors.grey.shade200),
+          width: widget.isSelected ? 2 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1251,6 +1359,7 @@ class _FieldRowState extends State<_FieldRow> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _labelCtrl,
+            focusNode: _labelFocus,
             decoration: const InputDecoration(
               labelText: 'Préfixe (optionnel)',
               hintText: 'Ex: Émise le',
@@ -1261,12 +1370,14 @@ class _FieldRowState extends State<_FieldRow> {
             ),
             style: const TextStyle(fontSize: 12),
             onChanged: (v) => widget.onChanged(
-                widget.field.copyWith(label: v.isEmpty ? null : v)),
+                widget.field.copyWith(
+                    label: v.isEmpty ? null : v, clearLabel: v.isEmpty)),
           ),
           if (isManual) ...[
             const SizedBox(height: 8),
             TextFormField(
               controller: _valueCtrl,
+              focusNode: _valueFocus,
               decoration: const InputDecoration(
                 labelText: 'Texte',
                 isDense: true,
@@ -1275,8 +1386,9 @@ class _FieldRowState extends State<_FieldRow> {
                 border: OutlineInputBorder(),
               ),
               style: const TextStyle(fontSize: 12),
-              onChanged: (v) => widget.onChanged(widget.field
-                  .copyWith(manualValue: v.isEmpty ? null : v)),
+              onChanged: (v) => widget.onChanged(widget.field.copyWith(
+                  manualValue: v.isEmpty ? null : v,
+                  clearManualValue: v.isEmpty)),
             ),
           ],
           const SizedBox(height: 8),

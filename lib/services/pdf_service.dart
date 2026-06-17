@@ -432,7 +432,7 @@ class PdfService {
         children: [
           pw.Expanded(
             child: _amountTile(
-              label: 'Montant total',
+              label: 'Montant total TTC',
               value: CurrencyFormatter.format(invoice.totalAmount),
               color: _textDark,
               large: false,

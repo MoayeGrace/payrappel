@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "D:/My project/payrappel/linux"
+    "cmake.sourceDirectory": "D:/My project/payrappel/linux",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

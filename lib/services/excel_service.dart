@@ -29,8 +29,7 @@ class ExcelService {
     required ExcelExportOptions options,
   }) {
     final excel = Excel.createExcel();
-    // Remove the default sheet
-    excel.delete('Sheet1');
+    final defaultSheets = List<String>.from(excel.sheets.keys);
 
     final filteredInvoices = invoices.where((i) {
       return !i.createdAt.isBefore(options.from) && !i.createdAt.isAfter(options.to);
@@ -51,6 +50,10 @@ class ExcelService {
     }
     if (options.includeStats) {
       _addStatsSheet(excel, filteredInvoices, filteredPayments);
+    }
+
+    for (final name in defaultSheets) {
+      excel.delete(name);
     }
 
     return excel.save();

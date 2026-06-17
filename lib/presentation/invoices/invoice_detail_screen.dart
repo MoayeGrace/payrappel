@@ -82,18 +82,21 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
     );
   }
 
-  Future<void> _exportPdf() async {
-    final selected = await _pickTemplate();
-    if (selected == null || !mounted) return;
-
-    // Persist template choice
-    if (selected.id != invoice.templateId) {
-      context.read<InvoiceProvider>()
-          .updateInvoice(invoice.copyWith(templateId: selected.id));
+  InvoiceTemplateModel _resolveTemplate() {
+    final prov = context.read<InvoiceTemplateProvider>();
+    if (invoice.templateId != null) {
+      final found = prov.findById(invoice.templateId!);
+      if (found != null) return found;
     }
+    // Aucun template assigné : préférer le premier template perso, sinon le défaut
+    if (prov.userTemplates.isNotEmpty) return prov.userTemplates.first;
+    return prov.defaultTemplate;
+  }
 
+  Future<void> _exportPdf() async {
     setState(() => _exportingPdf = true);
     final messenger = ScaffoldMessenger.of(context);
+    final template = _resolveTemplate();
     final clientProv = context.read<ClientProvider>();
     final paymentProv = context.read<PaymentProvider>();
     final profile = context.read<BusinessProfileProvider>().profile;
@@ -102,7 +105,7 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
       final payments =
           await paymentProv.watchPaymentsByInvoice(invoice.id).first;
       final bytes = await TemplatePdfService.generate(
-        template: selected,
+        template: template,
         invoice: invoice,
         payments: payments,
         profile: profile,
@@ -357,12 +360,16 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
                 const SizedBox(height: 10),
                 Consumer<InvoiceTemplateProvider>(
                   builder: (_, prov, __) {
-                    final name = invoice.templateId != null
-                        ? prov.allTemplates
-                            .firstWhere((t) => t.id == invoice.templateId,
-                                orElse: () => prov.defaultTemplate)
-                            .name
-                        : prov.defaultTemplate.name;
+                    // Même logique que _resolveTemplate() pour cohérence affichage/PDF
+                    final InvoiceTemplateModel effective;
+                    if (invoice.templateId != null) {
+                      effective = prov.findById(invoice.templateId!) ?? prov.defaultTemplate;
+                    } else if (prov.userTemplates.isNotEmpty) {
+                      effective = prov.userTemplates.first;
+                    } else {
+                      effective = prov.defaultTemplate;
+                    }
+                    final name = effective.name;
                     return Row(
                       children: [
                         const Icon(Icons.description_outlined,

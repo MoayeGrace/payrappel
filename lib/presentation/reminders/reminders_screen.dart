@@ -19,19 +19,23 @@ class RemindersScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           elevation: 0,
-          backgroundColor: const Color(0xFF1A73E8),
-          foregroundColor: Colors.white,
-          title: const Text(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          title: Text(
             'Rappels',
-            style: TextStyle(fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
-          bottom: const TabBar(
-            indicatorColor: Color(0xFF00BFA5),
+          bottom: TabBar(
+            indicatorColor: const Color(0xFF00BFA5),
             indicatorWeight: 3,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white60,
-            labelStyle: TextStyle(fontWeight: FontWeight.w600),
-            tabs: [
+            labelColor: Theme.of(context).colorScheme.onSurface,
+            unselectedLabelColor:
+                Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+            labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+            tabs: const [
               Tab(text: 'À venir'),
               Tab(text: 'Passés'),
             ],

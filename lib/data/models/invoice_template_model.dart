@@ -102,11 +102,13 @@ class TemplateFieldConfig {
     bool? large,
     int? textColor,
     bool clearTextColor = false,
+    bool clearLabel = false,
+    bool clearManualValue = false,
   }) =>
       TemplateFieldConfig(
         source: source ?? this.source,
-        label: label ?? this.label,
-        manualValue: manualValue ?? this.manualValue,
+        label: clearLabel ? null : (label ?? this.label),
+        manualValue: clearManualValue ? null : (manualValue ?? this.manualValue),
         bold: bold ?? this.bold,
         large: large ?? this.large,
         textColor: clearTextColor ? null : (textColor ?? this.textColor),

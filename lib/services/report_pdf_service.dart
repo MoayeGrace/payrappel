@@ -141,7 +141,7 @@ class ReportPdfService {
               ),
               pw.SizedBox(height: 4),
               pw.Text(
-                'Période : ${_fmt(from)} — ${_fmt(to)}',
+                'Période : ${_fmt(from)} - ${_fmt(to)}',
                 style: const pw.TextStyle(fontSize: 8, color: _grey),
               ),
             ],

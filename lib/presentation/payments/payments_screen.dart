@@ -30,11 +30,14 @@ class PaymentsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFF1A73E8),
-        foregroundColor: Colors.white,
-        title: const Text(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+        title: Text(
           'Paiements',
-          style: TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -101,24 +104,25 @@ class PaymentsScreen extends StatelessWidget {
 
           return Column(
             children: [
-              Container(
-                color: const Color(0xFF1A73E8),
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                 child: Row(
                   children: [
                     Expanded(
-                      child: _SummaryChip(
+                      child: _StatCard(
                         label: 'Ce mois',
                         value: CurrencyFormatter.format(monthTotal),
-                        color: const Color(0xFF00BFA5),
+                        icon: Icons.calendar_month_outlined,
+                        colors: const [Color(0xFF00897B), Color(0xFF00BFA5)],
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: _SummaryChip(
-                        label: 'Total',
+                      child: _StatCard(
+                        label: 'Total cumulé',
                         value: CurrencyFormatter.format(allTotal),
-                        color: Colors.white,
+                        icon: Icons.account_balance_wallet_outlined,
+                        colors: const [Color(0xFF1565C0), Color(0xFF1A73E8)],
                       ),
                     ),
                   ],
@@ -126,7 +130,7 @@ class PaymentsScreen extends StatelessWidget {
               ),
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
                   itemCount: payments.length,
                   itemBuilder: (_, i) =>
                       _PaymentTile(payment: payments[i]),
@@ -544,41 +548,69 @@ class _PaymentMethodDropdown extends StatelessWidget {
 }
 
 // ── Widgets ────────────────────────────────────────────────────────────────────
-class _SummaryChip extends StatelessWidget {
+class _StatCard extends StatelessWidget {
   final String label;
   final String value;
-  final Color color;
+  final IconData icon;
+  final List<Color> colors;
 
-  const _SummaryChip({
+  const _StatCard({
     required this.label,
     required this.value,
-    required this.color,
+    required this.icon,
+    required this.colors,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: colors.first.withOpacity(0.28),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style:
-                  const TextStyle(color: Colors.white70, fontSize: 11)),
-          const SizedBox(height: 2),
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: Colors.white, size: 17),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 3),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
               value,
-              style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],

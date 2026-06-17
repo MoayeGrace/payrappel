@@ -202,22 +202,30 @@ class _SelectableZone extends StatelessWidget {
   final TemplateSectionId id;
   final TemplateSectionId? selected;
   final ValueChanged<TemplateSectionId?>? onTap;
+  final VoidCallback? onAddField;
+  final OnSectionSwap? onSectionSwap;
   final Widget child;
 
   const _SelectableZone({
     required this.id,
     required this.selected,
     this.onTap,
+    this.onAddField,
+    this.onSectionSwap,
     required this.child,
   });
 
   bool get _isSelected => id == selected;
 
   static const _blue = Color(0xFF1A73E8);
+  static const _green = Color(0xFF34A853);
+  static const _orange = Color(0xFFF57C00);
 
   String get _label => switch (id) {
         TemplateSectionId.topLeft => 'En-tête G.',
         TemplateSectionId.topRight => 'En-tête D.',
+        TemplateSectionId.bottomLeft => 'Client',
+        TemplateSectionId.bottomRight => 'Champs libres',
         TemplateSectionId.bottomCenter => 'Pied de page',
         _ => '',
       };
@@ -225,11 +233,12 @@ class _SelectableZone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (onTap == null) return child;
-    return GestureDetector(
+
+    // The main tappable zone (select / deselect)
+    Widget zoneWidget = GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: () => onTap!(_isSelected ? null : id),
       child: Stack(
-        clipBehavior: Clip.none,
         children: [
           child,
           Positioned.fill(
@@ -245,41 +254,238 @@ class _SelectableZone extends StatelessWidget {
               ),
             ),
           ),
-          if (_isSelected)
-            Positioned(
-              top: -1,
-              left: 0,
-              child: IgnorePointer(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: const BoxDecoration(
-                    color: _blue,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(3),
-                      bottomRight: Radius.circular(4),
+        ],
+      ),
+    );
+
+    // Wrap in outer Stack so the overlay chips are siblings of the zone
+    // (not descendants), avoiding gesture conflicts.
+    Widget result = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        zoneWidget,
+        if (_isSelected)
+          Positioned(
+            top: -1,
+            left: 0,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Label chip (non-interactive)
+                IgnorePointer(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: const BoxDecoration(
+                      color: _blue,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(3),
+                        bottomRight: Radius.circular(4),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    _label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 6,
-                      fontWeight: FontWeight.bold,
+                    child: Text(
+                      _label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 6,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
+                // "+" button — interactive, separate from zone GestureDetector
+                if (onAddField != null) ...[
+                  const SizedBox(width: 2),
+                  GestureDetector(
+                    onTap: onAddField,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                      decoration: const BoxDecoration(
+                        color: _green,
+                        borderRadius: BorderRadius.only(
+                          topRight: Radius.circular(3),
+                          bottomRight: Radius.circular(4),
+                        ),
+                      ),
+                      child: const Icon(Icons.add,
+                          size: 8, color: Colors.white),
+                    ),
+                  ),
+                ],
+                // Drag handle — visible only when section is selected
+                if (onSectionSwap != null) ...[
+                  const SizedBox(width: 2),
+                  IgnorePointer(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                      decoration: const BoxDecoration(
+                        color: _orange,
+                        borderRadius: BorderRadius.only(
+                          topRight: Radius.circular(3),
+                          bottomRight: Radius.circular(4),
+                        ),
+                      ),
+                      child: const Icon(Icons.drag_indicator,
+                          size: 8, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+
+    // If drag-and-drop is enabled, wrap with DragTarget + LongPressDraggable
+    if (onSectionSwap != null) {
+      // Capture the current widget value before each wrapping to avoid
+      // the closure capturing the `result` variable by reference, which
+      // causes infinite recursion (Stack Overflow) when Flutter calls builder.
+      final innerWidget = result;
+      result = DragTarget<TemplateSectionId>(
+        onWillAcceptWithDetails: (d) => d.data != id,
+        onAcceptWithDetails: (d) => onSectionSwap!(d.data, id),
+        builder: (context, candidates, _) {
+          final isHovered = candidates.isNotEmpty;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            decoration: isHovered
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: _orange, width: 2),
+                    color: _orange.withOpacity(0.08),
+                  )
+                : const BoxDecoration(),
+            child: innerWidget,
+          );
+        },
+      );
+
+      final dragTarget = result;
+      result = LongPressDraggable<TemplateSectionId>(
+        data: id,
+        delay: const Duration(milliseconds: 350),
+        feedback: Material(
+          elevation: 6,
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _blue,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: _blue.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.drag_indicator,
+                    size: 12, color: Colors.white),
+                const SizedBox(width: 4),
+                Text(
+                  _label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        childWhenDragging: Opacity(opacity: 0.3, child: dragTarget),
+        child: dragTarget,
+      );
+    }
+
+    return result;
+  }
+}
+
+// ── Tappable section (table / payment — navigates to editor tab) ──────────────
+
+class _TappableSection extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final Widget child;
+
+  const _TappableSection({
+    required this.label,
+    required this.icon,
+    this.onTap,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (onTap == null) return child;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: const Color(0xFFCDD1D6), width: 0.8),
+            ),
+            child: child,
+          ),
+          Positioned(
+            top: -1,
+            right: 0,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF9AA0A6),
+                  borderRadius: BorderRadius.only(
+                    topRight: Radius.circular(3),
+                    bottomLeft: Radius.circular(4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 6, color: Colors.white),
+                    const SizedBox(width: 2),
+                    Text(label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 6,
+                          fontWeight: FontWeight.bold,
+                        )),
+                  ],
+                ),
               ),
             ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Inline field tap callback ─────────────────────────────────────────────────
+// ── Callbacks ─────────────────────────────────────────────────────────────────
 
 typedef OnInlineFieldTap = void Function(
     TemplateSectionId sectionId, int fieldIndex, TemplateFieldConfig field);
+
+typedef OnSectionAddField = void Function(TemplateSectionId sectionId);
+
+typedef OnSectionSwap = void Function(
+    TemplateSectionId from, TemplateSectionId to);
 
 // ── Document preview ──────────────────────────────────────────────────────────
 
@@ -293,6 +499,10 @@ class InvoiceDocPreview extends StatelessWidget {
   final ValueChanged<TemplateSectionId?>? onSectionTap;
   final List<PaymentMethodModel> paymentMethods;
   final OnInlineFieldTap? onFieldTap;
+  final OnSectionAddField? onAddField;
+  final OnSectionSwap? onSectionSwap;
+  final VoidCallback? onTableTap;
+  final VoidCallback? onPaymentTap;
 
   const InvoiceDocPreview({
     super.key,
@@ -305,6 +515,10 @@ class InvoiceDocPreview extends StatelessWidget {
     this.onSectionTap,
     this.paymentMethods = const [],
     this.onFieldTap,
+    this.onAddField,
+    this.onSectionSwap,
+    this.onTableTap,
+    this.onPaymentTap,
   });
 
   @override
@@ -323,6 +537,10 @@ class InvoiceDocPreview extends StatelessWidget {
               onSectionTap: onSectionTap,
               paymentMethods: paymentMethods,
               onFieldTap: onFieldTap,
+              onAddField: onAddField,
+              onSectionSwap: onSectionSwap,
+              onTableTap: onTableTap,
+              onPaymentTap: onPaymentTap,
             ),
           TemplateLayout.modern => _ModernDoc(
               accent: accent,
@@ -333,6 +551,10 @@ class InvoiceDocPreview extends StatelessWidget {
               onSectionTap: onSectionTap,
               paymentMethods: paymentMethods,
               onFieldTap: onFieldTap,
+              onAddField: onAddField,
+              onSectionSwap: onSectionSwap,
+              onTableTap: onTableTap,
+              onPaymentTap: onPaymentTap,
             ),
           TemplateLayout.minimal => _MinimalDoc(
               accent: accent,
@@ -342,6 +564,10 @@ class InvoiceDocPreview extends StatelessWidget {
               onSectionTap: onSectionTap,
               paymentMethods: paymentMethods,
               onFieldTap: onFieldTap,
+              onAddField: onAddField,
+              onSectionSwap: onSectionSwap,
+              onTableTap: onTableTap,
+              onPaymentTap: onPaymentTap,
             ),
           TemplateLayout.bold => _BoldDoc(
               accent: accent,
@@ -352,6 +578,10 @@ class InvoiceDocPreview extends StatelessWidget {
               onSectionTap: onSectionTap,
               paymentMethods: paymentMethods,
               onFieldTap: onFieldTap,
+              onAddField: onAddField,
+              onSectionSwap: onSectionSwap,
+              onTableTap: onTableTap,
+              onPaymentTap: onPaymentTap,
             ),
         },
       ),
@@ -369,6 +599,10 @@ class _ClassicDoc extends StatelessWidget {
   final ValueChanged<TemplateSectionId?>? onSectionTap;
   final List<PaymentMethodModel> paymentMethods;
   final OnInlineFieldTap? onFieldTap;
+  final OnSectionAddField? onAddField;
+  final OnSectionSwap? onSectionSwap;
+  final VoidCallback? onTableTap;
+  final VoidCallback? onPaymentTap;
 
   const _ClassicDoc({
     required this.accent,
@@ -378,6 +612,10 @@ class _ClassicDoc extends StatelessWidget {
     this.onSectionTap,
     this.paymentMethods = const [],
     this.onFieldTap,
+    this.onAddField,
+    this.onSectionSwap,
+    this.onTableTap,
+    this.onPaymentTap,
   });
 
   @override
@@ -406,6 +644,10 @@ class _ClassicDoc extends StatelessWidget {
                     id: TemplateSectionId.topLeft,
                     selected: selectedSection,
                     onTap: onSectionTap,
+                    onSectionSwap: onSectionSwap,
+                    onAddField: onAddField != null
+                        ? () => onAddField!(TemplateSectionId.topLeft)
+                        : null,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -447,6 +689,10 @@ class _ClassicDoc extends StatelessWidget {
                   id: TemplateSectionId.topRight,
                   selected: selectedSection,
                   onTap: onSectionTap,
+                  onSectionSwap: onSectionSwap,
+                  onAddField: onAddField != null
+                      ? () => onAddField!(TemplateSectionId.topRight)
+                      : null,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -484,45 +730,83 @@ class _ClassicDoc extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          // Parties
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
-                  child: _partyBox(
-                    title: 'ÉMETTEUR',
-                    name: profile.companyName,
-                    lines: [
-                      if (profile.address.isNotEmpty) profile.address,
-                      if (profile.phone.isNotEmpty) profile.phone,
-                    ],
-                    bg: accent.withOpacity(0.07),
+                  child: _SelectableZone(
+                    id: TemplateSectionId.bottomLeft,
+                    selected: selectedSection,
+                    onTap: onSectionTap,
+                    onSectionSwap: onSectionSwap,
+                    onAddField: onAddField != null
+                        ? () => onAddField!(TemplateSectionId.bottomLeft)
+                        : null,
+                    child: template.bottomLeft.isEmpty
+                        ? _partyBox(
+                            title: 'CLIENT',
+                            name: 'Jean Dupont',
+                            lines: const ['+225 05 00 00 00'],
+                            bg: const Color(0xFFF8F9FA),
+                          )
+                        : _renderSection(template.bottomLeft, profile,
+                            boldColor: const Color(0xFF202124),
+                            baseFontSize: 9,
+                            sectionId: TemplateSectionId.bottomLeft,
+                            onFieldTap: onFieldTap),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: _partyBox(
-                    title: 'CLIENT',
-                    name: 'Jean Dupont',
-                    lines: const ['+225 05 00 00 00'],
-                    bg: const Color(0xFFF8F9FA),
+                  child: _SelectableZone(
+                    id: TemplateSectionId.bottomRight,
+                    selected: selectedSection,
+                    onTap: onSectionTap,
+                    onSectionSwap: onSectionSwap,
+                    onAddField: onAddField != null
+                        ? () => onAddField!(TemplateSectionId.bottomRight)
+                        : null,
+                    child: template.bottomRight.isEmpty
+                        ? _customFieldsBox(accent)
+                        : _renderSection(template.bottomRight, profile,
+                            boldColor: const Color(0xFF202124),
+                            baseFontSize: 9,
+                            sectionId: TemplateSectionId.bottomRight,
+                            onFieldTap: onFieldTap),
                   ),
                 ),
-                const SizedBox(width: 6),
-                Expanded(child: _invoiceInfoBox(accent)),
               ],
             ),
           ),
           const SizedBox(height: 14),
-          _tablePreview(template, accent),
-          _amountsBox(accent),
-          if (template.showPaymentMethods) _paymentMethodsBlock(template, accent, paymentMethods),
+          _TappableSection(
+            label: 'Tableau',
+            icon: Icons.table_chart_outlined,
+            onTap: onTableTap,
+            child: Column(
+              children: [
+                _tablePreview(template, accent),
+                _amountsBox(accent),
+              ],
+            ),
+          ),
+          if (template.showPaymentMethods)
+            _TappableSection(
+              label: 'Paiement',
+              icon: Icons.payments_outlined,
+              onTap: onPaymentTap,
+              child: _paymentMethodsBlock(template, accent, paymentMethods),
+            ),
           const SizedBox(height: 14),
           _SelectableZone(
             id: TemplateSectionId.bottomCenter,
             selected: selectedSection,
             onTap: onSectionTap,
+            onSectionSwap: onSectionSwap,
+            onAddField: onAddField != null
+                ? () => onAddField!(TemplateSectionId.bottomCenter)
+                : null,
             child: _footerSection(template.bottomCenter, accent, profile, onFieldTap: onFieldTap),
           ),
         ],
@@ -542,6 +826,10 @@ class _ModernDoc extends StatelessWidget {
   final ValueChanged<TemplateSectionId?>? onSectionTap;
   final List<PaymentMethodModel> paymentMethods;
   final OnInlineFieldTap? onFieldTap;
+  final OnSectionAddField? onAddField;
+  final OnSectionSwap? onSectionSwap;
+  final VoidCallback? onTableTap;
+  final VoidCallback? onPaymentTap;
 
   const _ModernDoc({
     required this.accent,
@@ -552,6 +840,10 @@ class _ModernDoc extends StatelessWidget {
     this.onSectionTap,
     this.paymentMethods = const [],
     this.onFieldTap,
+    this.onAddField,
+    this.onSectionSwap,
+    this.onTableTap,
+    this.onPaymentTap,
   });
 
   @override
@@ -584,48 +876,80 @@ class _ModernDoc extends StatelessWidget {
                   id: TemplateSectionId.topLeft,
                   selected: selectedSection,
                   onTap: onSectionTap,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(profile.companyName,
-                          style: TextStyle(
-                              color: textOnHeader,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold)),
-                      if (profile.address.isNotEmpty)
-                        Text(profile.address,
-                            style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 9)),
-                      if (profile.phone.isNotEmpty)
-                        Text(profile.phone,
-                            style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 9)),
-                    ],
-                  ),
+                  onSectionSwap: onSectionSwap,
+                  onAddField: onAddField != null
+                      ? () => onAddField!(TemplateSectionId.topLeft)
+                      : null,
+                  child: template.topLeft.isEmpty
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(profile.companyName,
+                                style: TextStyle(
+                                    color: textOnHeader,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold)),
+                            if (profile.address.isNotEmpty)
+                              Text(profile.address,
+                                  style: TextStyle(
+                                      color: textOnHeader.withOpacity(0.7),
+                                      fontSize: 9)),
+                            if (profile.phone.isNotEmpty)
+                              Text(profile.phone,
+                                  style: TextStyle(
+                                      color: textOnHeader.withOpacity(0.7),
+                                      fontSize: 9)),
+                          ],
+                        )
+                      : _renderSection(template.topLeft, profile,
+                          boldColor: textOnHeader,
+                          baseColor: textOnHeader.withOpacity(0.7),
+                          baseFontSize: 9,
+                          sectionId: TemplateSectionId.topLeft,
+                          onFieldTap: onFieldTap),
                 ),
               ),
               _SelectableZone(
                 id: TemplateSectionId.topRight,
                 selected: selectedSection,
                 onTap: onSectionTap,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(template.titleLabel,
-                        style: TextStyle(
-                            color: textOnHeader,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2)),
-                    const SizedBox(height: 3),
-                    Text('N° FAC-2026-A3B4C5',
-                        style: TextStyle(
-                            color: textOnHeader, fontSize: 9, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 2),
-                    Text('Facture Janv. 2026',
-                        style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 9)),
-                    Text('Éch. : 31/01/2026',
-                        style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 9)),
-                  ],
-                ),
+                onSectionSwap: onSectionSwap,
+                onAddField: onAddField != null
+                    ? () => onAddField!(TemplateSectionId.topRight)
+                    : null,
+                child: template.topRight.isEmpty
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(template.titleLabel,
+                              style: TextStyle(
+                                  color: textOnHeader,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 2)),
+                          const SizedBox(height: 3),
+                          Text('N° FAC-2026-A3B4C5',
+                              style: TextStyle(
+                                  color: textOnHeader,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 2),
+                          Text('Facture Janv. 2026',
+                              style: TextStyle(
+                                  color: textOnHeader.withOpacity(0.7),
+                                  fontSize: 9)),
+                          Text('Éch. : 31/01/2026',
+                              style: TextStyle(
+                                  color: textOnHeader.withOpacity(0.7),
+                                  fontSize: 9)),
+                        ],
+                      )
+                    : _renderSection(template.topRight, profile,
+                        boldColor: textOnHeader,
+                        baseColor: textOnHeader.withOpacity(0.7),
+                        baseFontSize: 9,
+                        sectionId: TemplateSectionId.topRight,
+                        onFieldTap: onFieldTap),
               ),
             ],
           ),
@@ -641,28 +965,78 @@ class _ModernDoc extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
-                      child: _partyBox(
-                        title: 'CLIENT',
-                        name: 'Jean Dupont',
-                        lines: const ['+225 05 00 00 00'],
-                        bg: const Color(0xFFF8F9FA),
+                      child: _SelectableZone(
+                        id: TemplateSectionId.bottomLeft,
+                        selected: selectedSection,
+                        onTap: onSectionTap,
+                        onSectionSwap: onSectionSwap,
+                        onAddField: onAddField != null
+                            ? () => onAddField!(TemplateSectionId.bottomLeft)
+                            : null,
+                        child: template.bottomLeft.isEmpty
+                            ? _partyBox(
+                                title: 'CLIENT',
+                                name: 'Jean Dupont',
+                                lines: const ['+225 05 00 00 00'],
+                                bg: const Color(0xFFF8F9FA),
+                              )
+                            : _renderSection(template.bottomLeft, profile,
+                                boldColor: const Color(0xFF202124),
+                                baseFontSize: 9,
+                                sectionId: TemplateSectionId.bottomLeft,
+                                onFieldTap: onFieldTap),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(child: _invoiceInfoBox(accent)),
+                    Expanded(
+                      child: _SelectableZone(
+                        id: TemplateSectionId.bottomRight,
+                        selected: selectedSection,
+                        onTap: onSectionTap,
+                        onSectionSwap: onSectionSwap,
+                        onAddField: onAddField != null
+                            ? () => onAddField!(TemplateSectionId.bottomRight)
+                            : null,
+                        child: template.bottomRight.isEmpty
+                            ? _customFieldsBox(accent)
+                            : _renderSection(template.bottomRight, profile,
+                                boldColor: const Color(0xFF202124),
+                                baseFontSize: 9,
+                                sectionId: TemplateSectionId.bottomRight,
+                                onFieldTap: onFieldTap),
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
-              _tablePreview(template, accent),
-              _amountsBox(accent),
+              _TappableSection(
+                label: 'Tableau',
+                icon: Icons.table_chart_outlined,
+                onTap: onTableTap,
+                child: Column(
+                  children: [
+                    _tablePreview(template, accent),
+                    _amountsBox(accent),
+                  ],
+                ),
+              ),
               if (template.showPaymentMethods)
-                _paymentMethodsBlock(template, accent, paymentMethods),
+                _TappableSection(
+                  label: 'Paiement',
+                  icon: Icons.payments_outlined,
+                  onTap: onPaymentTap,
+                  child: _paymentMethodsBlock(template, accent, paymentMethods),
+                ),
               const SizedBox(height: 14),
               _SelectableZone(
                 id: TemplateSectionId.bottomCenter,
                 selected: selectedSection,
                 onTap: onSectionTap,
+                onSectionSwap: onSectionSwap,
+                onAddField: onAddField != null
+                    ? () => onAddField!(TemplateSectionId.bottomCenter)
+                    : null,
                 child: _footerSection(template.bottomCenter, accent, profile, onFieldTap: onFieldTap),
               ),
             ],
@@ -683,6 +1057,10 @@ class _MinimalDoc extends StatelessWidget {
   final ValueChanged<TemplateSectionId?>? onSectionTap;
   final List<PaymentMethodModel> paymentMethods;
   final OnInlineFieldTap? onFieldTap;
+  final OnSectionAddField? onAddField;
+  final OnSectionSwap? onSectionSwap;
+  final VoidCallback? onTableTap;
+  final VoidCallback? onPaymentTap;
 
   const _MinimalDoc({
     required this.accent,
@@ -692,6 +1070,10 @@ class _MinimalDoc extends StatelessWidget {
     this.onSectionTap,
     this.paymentMethods = const [],
     this.onFieldTap,
+    this.onAddField,
+    this.onSectionSwap,
+    this.onTableTap,
+    this.onPaymentTap,
   });
 
   @override
@@ -709,28 +1091,61 @@ class _MinimalDoc extends StatelessWidget {
                   id: TemplateSectionId.topLeft,
                   selected: selectedSection,
                   onTap: onSectionTap,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _bold(profile.companyName, size: 14),
-                      if (profile.phone.isNotEmpty) _grey(profile.phone),
-                      if (profile.email.isNotEmpty) _grey(profile.email),
-                    ],
-                  ),
+                  onSectionSwap: onSectionSwap,
+                  onAddField: onAddField != null
+                      ? () => onAddField!(TemplateSectionId.topLeft)
+                      : null,
+                  child: template.topLeft.isEmpty
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _bold(profile.companyName, size: 14),
+                            if (profile.phone.isNotEmpty) _grey(profile.phone),
+                            if (profile.email.isNotEmpty) _grey(profile.email),
+                          ],
+                        )
+                      : _renderSection(template.topLeft, profile,
+                          boldColor: const Color(0xFF202124),
+                          baseFontSize: 9,
+                          sectionId: TemplateSectionId.topLeft,
+                          onFieldTap: onFieldTap),
                 ),
               ),
               _SelectableZone(
                 id: TemplateSectionId.topRight,
                 selected: selectedSection,
                 onTap: onSectionTap,
-                child: Text(
-                  template.titleLabel,
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: accent,
-                      letterSpacing: 2),
-                ),
+                onSectionSwap: onSectionSwap,
+                onAddField: onAddField != null
+                    ? () => onAddField!(TemplateSectionId.topRight)
+                    : null,
+                child: template.topRight.isEmpty
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            template.titleLabel,
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: accent,
+                                letterSpacing: 2),
+                          ),
+                          const SizedBox(height: 2),
+                          Text('N° FAC-2026-A3B4C5',
+                              style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  color: accent)),
+                          _metaRow('Émise', '01/01/2026'),
+                          _metaRow('Échéance', '31/01/2026'),
+                        ],
+                      )
+                    : _renderSection(template.topRight, profile,
+                        boldColor: const Color(0xFF202124),
+                        baseFontSize: 9,
+                        sectionId: TemplateSectionId.topRight,
+                        onFieldTap: onFieldTap),
               ),
             ],
           ),
@@ -742,33 +1157,49 @@ class _MinimalDoc extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _sectionLabel('FACTURE'),
-                      const SizedBox(height: 3),
-                      _bold('Facture Janv. 2026', size: 11),
-                      const SizedBox(height: 2),
-                      Text('N° FAC-2026-A3B4C5',
-                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: accent)),
-                      const SizedBox(height: 4),
-                      _metaRow('Émise', '01/01/2026'),
-                      _metaRow('Échéance', '31/01/2026'),
-                      _metaRow('Statut', 'En cours'),
-                    ],
+                  child: _SelectableZone(
+                    id: TemplateSectionId.bottomLeft,
+                    selected: selectedSection,
+                    onTap: onSectionTap,
+                    onSectionSwap: onSectionSwap,
+                    onAddField: onAddField != null
+                        ? () => onAddField!(TemplateSectionId.bottomLeft)
+                        : null,
+                    child: template.bottomLeft.isEmpty
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _sectionLabel('CLIENT'),
+                              const SizedBox(height: 3),
+                              _bold('Jean Dupont', size: 11),
+                              _grey('+225 05 00 00 00'),
+                              _grey('jean@email.com'),
+                            ],
+                          )
+                        : _renderSection(template.bottomLeft, profile,
+                            boldColor: const Color(0xFF202124),
+                            baseFontSize: 9,
+                            sectionId: TemplateSectionId.bottomLeft,
+                            onFieldTap: onFieldTap),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _sectionLabel('CLIENT'),
-                      const SizedBox(height: 3),
-                      _bold('Jean Dupont', size: 11),
-                      _grey('+225 05 00 00 00'),
-                      _grey('jean@email.com'),
-                    ],
+                  child: _SelectableZone(
+                    id: TemplateSectionId.bottomRight,
+                    selected: selectedSection,
+                    onTap: onSectionTap,
+                    onSectionSwap: onSectionSwap,
+                    onAddField: onAddField != null
+                        ? () => onAddField!(TemplateSectionId.bottomRight)
+                        : null,
+                    child: template.bottomRight.isEmpty
+                        ? _customFieldsBox(accent)
+                        : _renderSection(template.bottomRight, profile,
+                            boldColor: const Color(0xFF202124),
+                            baseFontSize: 9,
+                            sectionId: TemplateSectionId.bottomRight,
+                            onFieldTap: onFieldTap),
                   ),
                 ),
               ],
@@ -777,15 +1208,33 @@ class _MinimalDoc extends StatelessWidget {
           const SizedBox(height: 14),
           Divider(color: Colors.grey.shade200, thickness: 0.5),
           const SizedBox(height: 10),
-          _tablePreview(template, accent),
-          _amountsBox(accent),
+          _TappableSection(
+            label: 'Tableau',
+            icon: Icons.table_chart_outlined,
+            onTap: onTableTap,
+            child: Column(
+              children: [
+                _tablePreview(template, accent),
+                _amountsBox(accent),
+              ],
+            ),
+          ),
           if (template.showPaymentMethods)
-            _paymentMethodsBlock(template, accent, paymentMethods),
+            _TappableSection(
+              label: 'Paiement',
+              icon: Icons.payments_outlined,
+              onTap: onPaymentTap,
+              child: _paymentMethodsBlock(template, accent, paymentMethods),
+            ),
           const SizedBox(height: 14),
           _SelectableZone(
             id: TemplateSectionId.bottomCenter,
             selected: selectedSection,
             onTap: onSectionTap,
+            onSectionSwap: onSectionSwap,
+            onAddField: onAddField != null
+                ? () => onAddField!(TemplateSectionId.bottomCenter)
+                : null,
             child: _footerSection(template.bottomCenter, accent, profile, onFieldTap: onFieldTap),
           ),
         ],
@@ -805,6 +1254,10 @@ class _BoldDoc extends StatelessWidget {
   final ValueChanged<TemplateSectionId?>? onSectionTap;
   final List<PaymentMethodModel> paymentMethods;
   final OnInlineFieldTap? onFieldTap;
+  final OnSectionAddField? onAddField;
+  final OnSectionSwap? onSectionSwap;
+  final VoidCallback? onTableTap;
+  final VoidCallback? onPaymentTap;
 
   const _BoldDoc({
     required this.accent,
@@ -815,6 +1268,10 @@ class _BoldDoc extends StatelessWidget {
     this.onSectionTap,
     this.paymentMethods = const [],
     this.onFieldTap,
+    this.onAddField,
+    this.onSectionSwap,
+    this.onTableTap,
+    this.onPaymentTap,
   });
 
   @override
@@ -847,37 +1304,66 @@ class _BoldDoc extends StatelessWidget {
                   id: TemplateSectionId.topLeft,
                   selected: selectedSection,
                   onTap: onSectionTap,
-                  child: Text(
-                    topTitle.toUpperCase(),
-                    style: TextStyle(
-                        color: textOnHeader,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 3),
-                  ),
+                  onSectionSwap: onSectionSwap,
+                  onAddField: onAddField != null
+                      ? () => onAddField!(TemplateSectionId.topLeft)
+                      : null,
+                  child: template.topLeft.isEmpty
+                      ? Text(
+                          topTitle.toUpperCase(),
+                          style: TextStyle(
+                              color: textOnHeader,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 3),
+                        )
+                      : _renderSection(template.topLeft, profile,
+                          boldColor: textOnHeader,
+                          baseColor: textOnHeader.withOpacity(0.7),
+                          baseFontSize: 9,
+                          sectionId: TemplateSectionId.topLeft,
+                          onFieldTap: onFieldTap),
                 ),
               ),
               _SelectableZone(
                 id: TemplateSectionId.topRight,
                 selected: selectedSection,
                 onTap: onSectionTap,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('Facture Janv. 2026',
-                        style: TextStyle(
-                            color: textOnHeader, fontSize: 9, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text('N° FAC-2026-A3B4C5',
-                        style: TextStyle(
-                            color: textOnHeader, fontSize: 8, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 2),
-                    Text('Émis le 01/01/2026',
-                        style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 8)),
-                    Text('Éch. 31/01/2026',
-                        style: TextStyle(color: textOnHeader.withOpacity(0.7), fontSize: 8)),
-                  ],
-                ),
+                onSectionSwap: onSectionSwap,
+                onAddField: onAddField != null
+                    ? () => onAddField!(TemplateSectionId.topRight)
+                    : null,
+                child: template.topRight.isEmpty
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('Facture Janv. 2026',
+                              style: TextStyle(
+                                  color: textOnHeader,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 2),
+                          Text('N° FAC-2026-A3B4C5',
+                              style: TextStyle(
+                                  color: textOnHeader,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 2),
+                          Text('Émis le 01/01/2026',
+                              style: TextStyle(
+                                  color: textOnHeader.withOpacity(0.7), fontSize: 8)),
+                          Text('Éch. 31/01/2026',
+                              style: TextStyle(
+                                  color: textOnHeader.withOpacity(0.7),
+                                  fontSize: 8)),
+                        ],
+                      )
+                    : _renderSection(template.topRight, profile,
+                        boldColor: textOnHeader,
+                        baseColor: textOnHeader.withOpacity(0.7),
+                        baseFontSize: 8,
+                        sectionId: TemplateSectionId.topRight,
+                        onFieldTap: onFieldTap),
               ),
             ],
           ),
@@ -896,38 +1382,78 @@ class _BoldDoc extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
-                      child: _partyBox(
-                        title: 'ÉMETTEUR',
-                        name: profile.companyName,
-                        lines: [
-                          if (profile.address.isNotEmpty) profile.address,
-                          if (profile.phone.isNotEmpty) profile.phone,
-                        ],
-                        bg: accent.withOpacity(0.07),
+                      child: _SelectableZone(
+                        id: TemplateSectionId.bottomLeft,
+                        selected: selectedSection,
+                        onTap: onSectionTap,
+                        onSectionSwap: onSectionSwap,
+                        onAddField: onAddField != null
+                            ? () => onAddField!(TemplateSectionId.bottomLeft)
+                            : null,
+                        child: template.bottomLeft.isEmpty
+                            ? _partyBox(
+                                title: 'CLIENT',
+                                name: 'Jean Dupont',
+                                lines: const ['+225 05 00 00 00'],
+                                bg: const Color(0xFFF8F9FA),
+                              )
+                            : _renderSection(template.bottomLeft, profile,
+                                boldColor: const Color(0xFF202124),
+                                baseFontSize: 9,
+                                sectionId: TemplateSectionId.bottomLeft,
+                                onFieldTap: onFieldTap),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: _partyBox(
-                        title: 'CLIENT',
-                        name: 'Jean Dupont',
-                        lines: const ['+225 05 00 00 00'],
-                        bg: const Color(0xFFF8F9FA),
+                      child: _SelectableZone(
+                        id: TemplateSectionId.bottomRight,
+                        selected: selectedSection,
+                        onTap: onSectionTap,
+                        onSectionSwap: onSectionSwap,
+                        onAddField: onAddField != null
+                            ? () => onAddField!(TemplateSectionId.bottomRight)
+                            : null,
+                        child: template.bottomRight.isEmpty
+                            ? _customFieldsBox(accent)
+                            : _renderSection(template.bottomRight, profile,
+                                boldColor: const Color(0xFF202124),
+                                baseFontSize: 9,
+                                sectionId: TemplateSectionId.bottomRight,
+                                onFieldTap: onFieldTap),
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
-              _tablePreview(template, accent),
-              _amountsBox(accent),
+              _TappableSection(
+                label: 'Tableau',
+                icon: Icons.table_chart_outlined,
+                onTap: onTableTap,
+                child: Column(
+                  children: [
+                    _tablePreview(template, accent),
+                    _amountsBox(accent),
+                  ],
+                ),
+              ),
               if (template.showPaymentMethods)
-                _paymentMethodsBlock(template, accent, paymentMethods),
+                _TappableSection(
+                  label: 'Paiement',
+                  icon: Icons.payments_outlined,
+                  onTap: onPaymentTap,
+                  child: _paymentMethodsBlock(template, accent, paymentMethods),
+                ),
               const SizedBox(height: 14),
               _SelectableZone(
                 id: TemplateSectionId.bottomCenter,
                 selected: selectedSection,
                 onTap: onSectionTap,
+                onSectionSwap: onSectionSwap,
+                onAddField: onAddField != null
+                    ? () => onAddField!(TemplateSectionId.bottomCenter)
+                    : null,
                 child: _footerSection(template.bottomCenter, accent, profile, onFieldTap: onFieldTap),
               ),
             ],
@@ -1080,25 +1606,20 @@ Widget _partyBox({
   );
 }
 
-Widget _invoiceInfoBox(Color accent) {
+Widget _customFieldsBox(Color accent) {
   return Container(
     padding: const EdgeInsets.all(9),
     decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(5)),
+        color: accent.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: accent.withOpacity(0.18), width: 0.5)),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionLabel('FACTURE'),
-        const SizedBox(height: 3),
-        _bold('Facture Janv. 2026', size: 10),
-        const SizedBox(height: 2),
-        Text('N° FAC-2026-A3B4C5',
-            style: TextStyle(
-                fontSize: 8, fontWeight: FontWeight.bold, color: accent)),
-        const SizedBox(height: 3),
-        _metaRow('Émise', '01/01/2026'),
-        _metaRow('Éch.', '31/01/2026'),
+        _sectionLabel('CHAMPS LIBRES'),
+        const SizedBox(height: 4),
+        _grey('Conditions de paiement'),
+        _grey('Références, notes...'),
       ],
     ),
   );
@@ -1115,7 +1636,7 @@ Widget _amountsBox(Color accent) {
       children: [
         Expanded(
             child: _amountTile(
-                'Montant total', '150 000 FCFA', const Color(0xFF202124))),
+                'Montant total TTC', '150 000 FCFA', const Color(0xFF202124))),
         Container(width: 0.5, height: 34, color: Colors.grey.shade200),
         Expanded(
             child: _amountTile(
@@ -1218,21 +1739,32 @@ Widget _renderSection(
       final i = entry.key;
       final f = entry.value;
       final text = _fieldValue(f, profile);
-      if (text.isEmpty) return const SizedBox.shrink();
+      final isEditing = onFieldTap != null && sectionId != null;
+      if (text.isEmpty && !isEditing) return const SizedBox.shrink();
       final fg = f.textColor != null
           ? Color(f.textColor!)
           : (f.bold ? effectiveBold : effectiveBase);
-      Widget w = Text(
-        text,
-        textAlign: tAlign,
-        overflow: overflow,
-        style: TextStyle(
-          fontSize: f.large ? baseFontSize + 3 : baseFontSize,
-          fontWeight: f.bold ? FontWeight.bold : FontWeight.normal,
-          color: fg,
-        ),
-      );
-      if (onFieldTap != null && sectionId != null) {
+      Widget w = text.isEmpty
+          ? Text(
+              '(${f.source.displayName})',
+              textAlign: tAlign,
+              style: TextStyle(
+                fontSize: f.large ? baseFontSize + 3 : baseFontSize,
+                fontStyle: FontStyle.italic,
+                color: Colors.grey.shade400,
+              ),
+            )
+          : Text(
+              text,
+              textAlign: tAlign,
+              overflow: overflow,
+              style: TextStyle(
+                fontSize: f.large ? baseFontSize + 3 : baseFontSize,
+                fontWeight: f.bold ? FontWeight.bold : FontWeight.normal,
+                color: fg,
+              ),
+            );
+      if (isEditing) {
         w = GestureDetector(
           onTap: () => onFieldTap(sectionId, i, f),
           child: w,
@@ -1281,20 +1813,30 @@ Widget _footerSection(
           final i = entry.key;
           final f = entry.value;
           final text = _fieldValue(f, profile);
-          if (text.isEmpty) return const SizedBox.shrink();
+          if (text.isEmpty && onFieldTap == null) return const SizedBox.shrink();
           final fg = f.textColor != null
               ? Color(f.textColor!)
               : (onDark ? Colors.white70 : Colors.grey.shade500);
-          Widget w = Text(
-            text,
-            textAlign: tAlign,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: f.large ? 11 : 8,
-              fontWeight: f.bold ? FontWeight.bold : FontWeight.normal,
-              color: fg,
-            ),
-          );
+          Widget w = text.isEmpty
+              ? Text(
+                  '(${f.source.displayName})',
+                  textAlign: tAlign,
+                  style: TextStyle(
+                    fontSize: f.large ? 11 : 8,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey.shade400,
+                  ),
+                )
+              : Text(
+                  text,
+                  textAlign: tAlign,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: f.large ? 11 : 8,
+                    fontWeight: f.bold ? FontWeight.bold : FontWeight.normal,
+                    color: fg,
+                  ),
+                );
           if (onFieldTap != null) {
             w = GestureDetector(
               onTap: () => onFieldTap(TemplateSectionId.bottomCenter, i, f),

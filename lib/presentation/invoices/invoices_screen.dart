@@ -18,11 +18,14 @@ class InvoicesScreen extends StatelessWidget {
         // 🔵 AppBar premium
         appBar: AppBar(
           elevation: 0,
-          backgroundColor: const Color(0xFF1E88E5),
-          foregroundColor: Colors.white,
-          title: const Text(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          title: Text(
             'Factures',
-            style: TextStyle(fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
           actions: [
             Container(
@@ -39,14 +42,13 @@ class InvoicesScreen extends StatelessWidget {
               ),
             ),
           ],
-
-          // 🔥 TabBar modernisée
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
-            indicatorColor: Color(0xFF00C6A2),
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
+            indicatorColor: const Color(0xFF00C6A2),
+            labelColor: Theme.of(context).colorScheme.onSurface,
+            unselectedLabelColor:
+                Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+            tabs: const [
               Tab(text: 'Toutes'),
               Tab(text: 'En cours'),
               Tab(text: 'En retard'),

@@ -257,7 +257,7 @@ class _WelcomeBanner extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Bonjour, $name 👋',
+                  'Bonjour, $name ',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,

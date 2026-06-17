@@ -16,12 +16,12 @@ class ClientsScreen extends StatelessWidget {
   elevation: 0,
   backgroundColor: Colors.transparent,
   centerTitle: false,
-  title: const Text(
+  title: Text(
     "Clients",
     style: TextStyle(
       fontSize: 28,
       fontWeight: FontWeight.bold,
-      color: AppColors.textPrimary,
+      color: Theme.of(context).colorScheme.onSurface,
     ),
   ),
   actions: [
