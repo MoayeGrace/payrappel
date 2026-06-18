@@ -27,10 +27,13 @@ class SettingsScreen extends StatelessWidget {
     final initial =
         displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headerColor = isDark ? const Color(0xFF1E2A3A) : const Color(0xFF1A73E8);
+
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFF1A73E8),
+        backgroundColor: headerColor,
         foregroundColor: Colors.white,
         title: const Text(
           'Paramètres',
@@ -41,7 +44,7 @@ class SettingsScreen extends StatelessWidget {
         children: [
           // ── Bandeau profil ───────────────────────────────────────────────
           Container(
-            color: const Color(0xFF1A73E8),
+            color: headerColor,
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
             child: Row(
               children: [

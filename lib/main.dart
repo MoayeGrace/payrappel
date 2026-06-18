@@ -9,4 +9,3 @@ void main() async {
   await NotificationService.initialize();
   runApp(const PayRappelApp());
 }
-

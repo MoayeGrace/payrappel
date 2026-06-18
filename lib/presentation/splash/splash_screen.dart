@@ -169,7 +169,7 @@ class _SplashScreenState extends State<SplashScreen>
                         child: Transform.scale(
                           scale: introScale * pulseScale,
                           child: Image.asset(
-                            'assets/icons/app_icon.png',
+                            'assets/icons/app_icon_foreground.png',
                             width: 260,
                             fit: BoxFit.contain,
                           ),

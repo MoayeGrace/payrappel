@@ -223,11 +223,11 @@ class _SelectableZone extends StatelessWidget {
 
   String get _label => switch (id) {
         TemplateSectionId.topLeft => 'En-tête G.',
+        TemplateSectionId.topCenter => 'En-tête Centre',
         TemplateSectionId.topRight => 'En-tête D.',
         TemplateSectionId.bottomLeft => 'Client',
         TemplateSectionId.bottomRight => 'Champs libres',
         TemplateSectionId.bottomCenter => 'Pied de page',
-        _ => '',
       };
 
   @override
@@ -626,13 +626,29 @@ class _ClassicDoc extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (!template.topCenter.isEmpty) ...[
+            _SelectableZone(
+              id: TemplateSectionId.topCenter,
+              selected: selectedSection,
+              onTap: onSectionTap,
+              onSectionSwap: onSectionSwap,
+              onAddField: onAddField != null
+                  ? () => onAddField!(TemplateSectionId.topCenter)
+                  : null,
+              child: _renderSection(template.topCenter, profile,
+                  boldColor: const Color(0xFF202124),
+                  baseFontSize: 9,
+                  sectionId: TemplateSectionId.topCenter,
+                  onFieldTap: onFieldTap),
+            ),
+            const SizedBox(height: 10),
+          ],
           // ── En-tête ───────────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
             decoration: BoxDecoration(
-              color: accent.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(5),
-              border: Border(left: BorderSide(color: accent, width: 3)),
+              color: accent.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -656,10 +672,10 @@ class _ClassicDoc extends StatelessWidget {
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: accent.withOpacity(0.12),
+                              color: accent.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(5),
                             ),
-                            child: Icon(Icons.business, color: accent, size: 20),
+                            child: Icon(Icons.business_outlined, color: accent, size: 20),
                           ),
                           const SizedBox(width: 8),
                         ],
@@ -723,6 +739,24 @@ class _ClassicDoc extends StatelessWidget {
                             baseFontSize: 8,
                             sectionId: TemplateSectionId.topRight,
                             onFieldTap: onFieldTap),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A73E8).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                              color: const Color(0xFF1A73E8), width: 0.5),
+                        ),
+                        child: const Text(
+                          'En cours',
+                          style: TextStyle(
+                              color: Color(0xFF1A73E8),
+                              fontSize: 7,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -960,6 +994,23 @@ class _ModernDoc extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
+              if (!template.topCenter.isEmpty) ...[
+                _SelectableZone(
+                  id: TemplateSectionId.topCenter,
+                  selected: selectedSection,
+                  onTap: onSectionTap,
+                  onSectionSwap: onSectionSwap,
+                  onAddField: onAddField != null
+                      ? () => onAddField!(TemplateSectionId.topCenter)
+                      : null,
+                  child: _renderSection(template.topCenter, profile,
+                      boldColor: const Color(0xFF202124),
+                      baseFontSize: 9,
+                      sectionId: TemplateSectionId.topCenter,
+                      onFieldTap: onFieldTap),
+                ),
+                const SizedBox(height: 10),
+              ],
               IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1277,9 +1328,6 @@ class _BoldDoc extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textOnHeader = TemplatePreviewScreen._contrastColor(headerBg);
-    final topTitle = template.topCenter.fields.isNotEmpty
-        ? (template.topCenter.fields.first.manualValue ?? template.titleLabel)
-        : template.titleLabel;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1301,27 +1349,27 @@ class _BoldDoc extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: _SelectableZone(
-                  id: TemplateSectionId.topLeft,
+                  id: TemplateSectionId.topCenter,
                   selected: selectedSection,
                   onTap: onSectionTap,
                   onSectionSwap: onSectionSwap,
                   onAddField: onAddField != null
-                      ? () => onAddField!(TemplateSectionId.topLeft)
+                      ? () => onAddField!(TemplateSectionId.topCenter)
                       : null,
-                  child: template.topLeft.isEmpty
+                  child: template.topCenter.isEmpty
                       ? Text(
-                          topTitle.toUpperCase(),
+                          template.titleLabel.toUpperCase(),
                           style: TextStyle(
                               color: textOnHeader,
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 3),
                         )
-                      : _renderSection(template.topLeft, profile,
+                      : _renderSection(template.topCenter, profile,
                           boldColor: textOnHeader,
                           baseColor: textOnHeader.withOpacity(0.7),
-                          baseFontSize: 9,
-                          sectionId: TemplateSectionId.topLeft,
+                          baseFontSize: 11,
+                          sectionId: TemplateSectionId.topCenter,
                           onFieldTap: onFieldTap),
                 ),
               ),
@@ -1583,6 +1631,7 @@ Widget _paymentMethodsBlock(
     ]),
   );
 }
+
 
 Widget _partyBox({
   required String title,
