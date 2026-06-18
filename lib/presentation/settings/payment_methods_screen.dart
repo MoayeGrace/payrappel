@@ -203,7 +203,11 @@ class _AddGrid extends StatelessWidget {
                       color: Colors.grey[400], size: 22)
                 else if (type.assetPath != null)
                   Image.asset(type.assetPath!,
-                      width: 28, height: 28, fit: BoxFit.contain)
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) =>
+                          Icon(type.icon, color: type.color, size: 22))
                 else
                   Icon(type.icon, color: type.color, size: 22),
                 const SizedBox(height: 6),
@@ -246,16 +250,42 @@ class _MethodTile extends StatelessWidget {
         File(method.logoPath!).existsSync()) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.file(File(method.logoPath!),
-            width: 40, height: 40, fit: BoxFit.cover),
+        child: Image.file(
+          File(method.logoPath!),
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(method.type.icon, color: color, size: 20),
+          ),
+        ),
       );
     }
     final assetPath = method.type.assetPath;
     if (assetPath != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.asset(assetPath,
-            width: 40, height: 40, fit: BoxFit.contain),
+        child: Image.asset(
+          assetPath,
+          width: 40,
+          height: 40,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(method.type.icon, color: color, size: 20),
+          ),
+        ),
       );
     }
     return Container(

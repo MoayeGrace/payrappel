@@ -22,9 +22,10 @@ class ClientProvider extends ChangeNotifier {
     required String name,
     required String phone,
     String email = '',
+    String address = '',
     String note = '',
   }) async {
-    await _repo.addClient(name: name, phone: phone, email: email, note: note);
+    await _repo.addClient(name: name, phone: phone, email: email, address: address, note: note);
   }
 
   Future<void> updateClient(ClientModel client) async {

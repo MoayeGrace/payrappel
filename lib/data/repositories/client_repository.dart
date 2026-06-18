@@ -41,6 +41,7 @@ class ClientRepository {
     required String name,
     required String phone,
     String email = '',
+    String address = '',
     String note = '',
   }) async {
     final id = _uuid.v4();
@@ -50,6 +51,7 @@ class ClientRepository {
       name: name,
       phone: phone,
       email: email,
+      address: address,
       note: note,
       createdAt: DateTime.now(),
     );

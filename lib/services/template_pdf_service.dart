@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../core/utils/currency_formatter.dart';
 import '../data/models/business_profile_model.dart';
 import '../data/models/invoice_model.dart';
@@ -65,12 +66,32 @@ class TemplatePdfService {
       pmLogos: pmLogos,
     );
 
-    final pdf = pw.Document();
+    pw.ThemeData? theme;
+    try {
+      final fontRegular = await PdfGoogleFonts.poppinsRegular();
+      final fontBold = await PdfGoogleFonts.poppinsBold();
+      final fontItalic = await PdfGoogleFonts.poppinsItalic();
+      theme = pw.ThemeData.withFont(
+        base: fontRegular,
+        bold: fontBold,
+        italic: fontItalic,
+      );
+    } catch (_) {}
+
+    final isBleed = template.layout == TemplateLayout.modern ||
+        template.layout == TemplateLayout.bold;
+    final pdf = pw.Document(theme: theme);
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 40, vertical: 36),
-        footer: (_) => _footer(ctx),
+        margin: isBleed
+            ? const pw.EdgeInsets.only(bottom: 36)
+            : const pw.EdgeInsets.symmetric(horizontal: 40, vertical: 36),
+        footer: (_) => isBleed
+            ? pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 40),
+                child: _footer(ctx))
+            : _footer(ctx),
         build: (_) => switch (template.layout) {
           TemplateLayout.classic => _buildClassic(ctx),
           TemplateLayout.modern => _buildModern(ctx),
@@ -94,7 +115,7 @@ class TemplatePdfService {
       pw.Container(
         padding: const pw.EdgeInsets.all(12),
         decoration: pw.BoxDecoration(
-          color: PdfColor(c.accent.red, c.accent.green, c.accent.blue, 0.07),
+          color: _blendOnWhite(c.accent, 0.07),
           borderRadius: pw.BorderRadius.circular(6),
         ),
           child: pw.Row(
@@ -107,24 +128,21 @@ class TemplatePdfService {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     if (c.template.showLogo) ...[
-                      if (c.logo != null)
-                        pw.Container(
-                          width: 38,
-                          height: 38,
-                          decoration: pw.BoxDecoration(
-                              borderRadius: pw.BorderRadius.circular(5)),
-                          child: pw.Image(c.logo!, fit: pw.BoxFit.contain),
-                        )
-                      else
-                        pw.Container(
-                          width: 38,
-                          height: 38,
-                          decoration: pw.BoxDecoration(
-                            color: PdfColor(
-                                c.accent.red, c.accent.green, c.accent.blue, 0.12),
-                            borderRadius: pw.BorderRadius.circular(5),
-                          ),
+                      pw.Container(
+                        width: 38,
+                        height: 38,
+                        decoration: pw.BoxDecoration(
+                          color: _blendOnWhite(c.accent, 0.10),
+                          borderRadius: pw.BorderRadius.circular(5),
                         ),
+                        child: c.logo != null
+                            ? pw.ClipRRect(
+                                horizontalRadius: 5,
+                                verticalRadius: 5,
+                                child: pw.Image(c.logo!, fit: pw.BoxFit.contain),
+                              )
+                            : pw.SizedBox(),
+                      ),
                       pw.SizedBox(width: 8),
                     ],
                     pw.Expanded(
@@ -157,7 +175,7 @@ class TemplatePdfService {
                   ],
                 ),
               ),
-              pw.SizedBox(width: 20),
+              pw.SizedBox(width: 16),
               // Droite : badge titre + numéro + méta
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -257,11 +275,21 @@ class TemplatePdfService {
           child: pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              if (c.logo != null) ...[
+              if (c.template.showLogo) ...[
                 pw.Container(
                   width: 44,
                   height: 44,
-                  child: pw.Image(c.logo!, fit: pw.BoxFit.contain),
+                  decoration: pw.BoxDecoration(
+                    color: _blendOnColor(c.headerBg, PdfColors.white, 0.18),
+                    borderRadius: pw.BorderRadius.circular(6),
+                  ),
+                  child: c.logo != null
+                      ? pw.ClipRRect(
+                          horizontalRadius: 6,
+                          verticalRadius: 6,
+                          child: pw.Image(c.logo!, fit: pw.BoxFit.contain),
+                        )
+                      : pw.SizedBox(),
                 ),
                 pw.SizedBox(width: 10),
               ],
@@ -295,11 +323,19 @@ class TemplatePdfService {
                         children: c.template.topLeft.fields.map((f) {
                           final text = _resolveField(f, c);
                           if (text.isEmpty) return pw.SizedBox();
+                          final display = (f.label != null && f.label!.isNotEmpty)
+                              ? '${f.label} : $text'
+                              : text;
+                          final fg = f.textColor != null
+                              ? _c(f.textColor!)
+                              : (f.bold
+                                  ? PdfColors.white
+                                  : _blendOnColor(c.headerBg, PdfColors.white, 0.7));
                           return pw.Text(
-                            text,
+                            display,
                             style: pw.TextStyle(
-                              color: PdfColors.white,
-                              fontSize: f.large ? 14 : 9,
+                              color: fg,
+                              fontSize: f.large ? 12 : 9,
                               fontWeight: f.bold
                                   ? pw.FontWeight.bold
                                   : pw.FontWeight.normal,
@@ -321,21 +357,20 @@ class TemplatePdfService {
                             letterSpacing: 2,
                           ),
                         ),
-                        pw.SizedBox(height: 4),
+                        pw.SizedBox(height: 3),
                         pw.Text(
                           _invoiceNum(c),
                           style: pw.TextStyle(
                               color: PdfColors.white,
-                              fontSize: 10,
+                              fontSize: 9,
                               fontWeight: pw.FontWeight.bold),
                         ),
                         pw.SizedBox(height: 2),
                         pw.Text(
                           c.invoice.title,
                           style: const pw.TextStyle(
-                              color: PdfColor(1, 1, 1, 0.7), fontSize: 11),
+                              color: PdfColor(1, 1, 1, 0.7), fontSize: 9),
                         ),
-                        pw.SizedBox(height: 4),
                         pw.Text(
                           'Échéance : ${_fmtDate(c.invoice.dueDate)}',
                           style: const pw.TextStyle(
@@ -348,11 +383,19 @@ class TemplatePdfService {
                       children: c.template.topRight.fields.map((f) {
                         final text = _resolveField(f, c);
                         if (text.isEmpty) return pw.SizedBox();
+                        final display = (f.label != null && f.label!.isNotEmpty)
+                            ? '${f.label} : $text'
+                            : text;
+                        final fg = f.textColor != null
+                            ? _c(f.textColor!)
+                            : (f.bold
+                                ? PdfColors.white
+                                : _blendOnColor(c.headerBg, PdfColors.white, 0.7));
                         return pw.Text(
-                          text,
+                          display,
                           style: pw.TextStyle(
-                            color: PdfColors.white,
-                            fontSize: f.large ? 14 : 9,
+                            color: fg,
+                            fontSize: f.large ? 12 : 9,
                             fontWeight: f.bold
                                 ? pw.FontWeight.bold
                                 : pw.FontWeight.normal,
@@ -364,12 +407,11 @@ class TemplatePdfService {
           ),
         ),
         pw.SizedBox(height: 16),
-        // Optional topCenter section
         if (!c.template.topCenter.isEmpty) ...[
-          _renderSection(c.template.topCenter, c, fullWidth: true),
+          _hpad(_renderSection(c.template.topCenter, c, fullWidth: true)),
           pw.SizedBox(height: 10),
         ],
-        pw.Row(
+        _hpad(pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Expanded(
@@ -389,23 +431,20 @@ class TemplatePdfService {
                   child: _renderSectionContent(c.template.bottomRight, c)),
             ],
           ],
-        ),
+        )),
         pw.SizedBox(height: 14),
         if (c.invoice.lineItems.isNotEmpty) ...[
-          _invoiceLineItemsBlock(c),
-          pw.SizedBox(height: 14),
-        ] else if (_showCustomTable(c)) ...[
-          _customTableBlock(c),
+          _hpad(_invoiceLineItemsBlock(c)),
           pw.SizedBox(height: 14),
         ],
-        _amountsBlock(c),
+        _hpad(_amountsBlock(c)),
         if (c.template.showPaymentMethods) ...[
           pw.SizedBox(height: 14),
-          _paymentMethodsBlock(c),
+          _hpad(_paymentMethodsBlock(c)),
         ],
         if (c.payments.isNotEmpty) ...[
           pw.SizedBox(height: 14),
-          _paymentsTable(c),
+          _hpad(_paymentsTable(c)),
         ],
     ];
   }
@@ -448,14 +487,20 @@ class TemplatePdfService {
                       children: c.template.topLeft.fields.map((f) {
                         final text = _resolveField(f, c);
                         if (text.isEmpty) return pw.SizedBox();
+                        final display = (f.label != null && f.label!.isNotEmpty)
+                            ? '${f.label} : $text'
+                            : text;
+                        final fg = f.textColor != null
+                            ? _c(f.textColor!)
+                            : (f.bold ? _kTextDark : _kTextGrey);
                         return pw.Text(
-                          text,
+                          display,
                           style: pw.TextStyle(
-                            fontSize: f.large ? 14 : 9,
+                            fontSize: f.large ? 12 : 9,
                             fontWeight: f.bold
                                 ? pw.FontWeight.bold
                                 : pw.FontWeight.normal,
-                            color: f.bold ? _kTextDark : _kTextGrey,
+                            color: fg,
                           ),
                         );
                       }).toList(),
@@ -491,10 +536,13 @@ class TemplatePdfService {
                     children: c.template.topRight.fields.map((f) {
                       final text = _resolveField(f, c);
                       if (text.isEmpty) return pw.SizedBox();
+                      final display = (f.label != null && f.label!.isNotEmpty)
+                          ? '${f.label} : $text'
+                          : text;
                       return pw.Text(
-                        text,
+                        display,
                         style: pw.TextStyle(
-                          fontSize: f.large ? 16 : 9,
+                          fontSize: f.large ? 12 : 9,
                           fontWeight: f.bold
                               ? pw.FontWeight.bold
                               : pw.FontWeight.normal,
@@ -586,14 +634,26 @@ class TemplatePdfService {
           child: pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              if (c.logo != null) ...[
+              if (c.logo != null)
                 pw.Container(
                   width: 44,
                   height: 44,
+                  decoration: pw.BoxDecoration(
+                    color: _blendOnColor(c.headerBg, PdfColors.white, 0.15),
+                    shape: pw.BoxShape.circle,
+                  ),
                   child: pw.Image(c.logo!, fit: pw.BoxFit.contain),
+                )
+              else
+                pw.Container(
+                  width: 44,
+                  height: 44,
+                  decoration: pw.BoxDecoration(
+                    color: _blendOnColor(c.headerBg, PdfColors.white, 0.15),
+                    shape: pw.BoxShape.circle,
+                  ),
                 ),
-                pw.SizedBox(width: 14),
-              ],
+              pw.SizedBox(width: 14),
               pw.Expanded(
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -602,11 +662,19 @@ class TemplatePdfService {
                       ...c.template.topCenter.fields.map((f) {
                         final text = _resolveField(f, c);
                         if (text.isEmpty) return pw.SizedBox();
+                        final display = (f.label != null && f.label!.isNotEmpty)
+                            ? '${f.label} : $text'
+                            : text;
+                        final fg = f.textColor != null
+                            ? _c(f.textColor!)
+                            : (f.bold
+                                ? PdfColors.white
+                                : _blendOnColor(c.headerBg, PdfColors.white, 0.7));
                         return pw.Text(
-                          text,
+                          display,
                           style: pw.TextStyle(
-                            color: PdfColors.white,
-                            fontSize: f.large ? 18 : 13,
+                            color: fg,
+                            fontSize: f.large ? 14 : 11,
                             fontWeight: f.bold
                                 ? pw.FontWeight.bold
                                 : pw.FontWeight.normal,
@@ -633,29 +701,28 @@ class TemplatePdfService {
                         if (c.template.topCenter.isEmpty)
                           pw.Text(
                             c.invoice.title,
-                            style: pw.TextStyle(
+                            style: const pw.TextStyle(
                                 color: PdfColors.white,
-                                fontSize: 12,
-                                fontWeight: pw.FontWeight.bold),
+                                fontSize: 9),
                           ),
-                        pw.SizedBox(height: 4),
+                        pw.SizedBox(height: 2),
                         pw.Text(
                           _invoiceNum(c),
                           style: pw.TextStyle(
                               color: PdfColors.white,
-                              fontSize: 10,
+                              fontSize: 8,
                               fontWeight: pw.FontWeight.bold),
                         ),
-                        pw.SizedBox(height: 4),
+                        pw.SizedBox(height: 2),
                         pw.Text(
                           'Émis le ${_fmtDate(c.invoice.createdAt)}',
                           style: const pw.TextStyle(
-                              color: PdfColor(1, 1, 1, 0.7), fontSize: 9),
+                              color: PdfColor(1, 1, 1, 0.7), fontSize: 8),
                         ),
                         pw.Text(
                           'Éch. ${_fmtDate(c.invoice.dueDate)}',
                           style: const pw.TextStyle(
-                              color: PdfColor(1, 1, 1, 0.7), fontSize: 9),
+                              color: PdfColor(1, 1, 1, 0.7), fontSize: 8),
                         ),
                       ],
                     )
@@ -664,11 +731,19 @@ class TemplatePdfService {
                       children: c.template.topRight.fields.map((f) {
                         final text = _resolveField(f, c);
                         if (text.isEmpty) return pw.SizedBox();
+                        final display = (f.label != null && f.label!.isNotEmpty)
+                            ? '${f.label} : $text'
+                            : text;
+                        final fg = f.textColor != null
+                            ? _c(f.textColor!)
+                            : (f.bold
+                                ? PdfColors.white
+                                : _blendOnColor(c.headerBg, PdfColors.white, 0.7));
                         return pw.Text(
-                          text,
+                          display,
                           style: pw.TextStyle(
-                            color: PdfColors.white,
-                            fontSize: f.large ? 12 : 9,
+                            color: fg,
+                            fontSize: f.large ? 11 : 8,
                             fontWeight: f.bold
                                 ? pw.FontWeight.bold
                                 : pw.FontWeight.normal,
@@ -681,15 +756,13 @@ class TemplatePdfService {
         ),
         pw.Container(
           height: 4,
-          color: PdfColor(
-            c.accent.red,
-            c.accent.green,
-            c.accent.blue,
+          color: _blendOnWhite(
+            c.accent,
             (0.2126 * c.accent.red + 0.7152 * c.accent.green + 0.0722 * c.accent.blue) > 0.5 ? 0.7 : 0.5,
           ),
         ),
         pw.SizedBox(height: 14),
-        pw.Row(
+        _hpad(pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Expanded(
@@ -709,23 +782,20 @@ class TemplatePdfService {
                   child: _renderSectionContent(c.template.bottomRight, c)),
             ],
           ],
-        ),
+        )),
         pw.SizedBox(height: 14),
         if (c.invoice.lineItems.isNotEmpty) ...[
-          _invoiceLineItemsBlock(c),
-          pw.SizedBox(height: 14),
-        ] else if (_showCustomTable(c)) ...[
-          _customTableBlock(c),
+          _hpad(_invoiceLineItemsBlock(c)),
           pw.SizedBox(height: 14),
         ],
-        _amountsBlock(c),
+        _hpad(_amountsBlock(c)),
         if (c.template.showPaymentMethods) ...[
           pw.SizedBox(height: 14),
-          _paymentMethodsBlock(c),
+          _hpad(_paymentMethodsBlock(c)),
         ],
         if (c.payments.isNotEmpty) ...[
           pw.SizedBox(height: 14),
-          _paymentsTable(c),
+          _hpad(_paymentsTable(c)),
         ],
     ];
   }
@@ -738,10 +808,9 @@ class TemplatePdfService {
       pw.SizedBox(height: 6),
       pw.Container(
         padding:
-            const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: pw.BoxDecoration(
-          color: PdfColor(
-              statusColor.red, statusColor.green, statusColor.blue, 0.12),
+          color: _blendOnWhite(statusColor, 0.12),
           borderRadius: pw.BorderRadius.circular(4),
           border: pw.Border.all(color: statusColor, width: 0.5),
         ),
@@ -749,7 +818,7 @@ class TemplatePdfService {
           _statusLabel(c.invoice.status),
           style: pw.TextStyle(
               color: statusColor,
-              fontSize: 9,
+              fontSize: 7,
               fontWeight: pw.FontWeight.bold),
         ),
       ),
@@ -787,7 +856,7 @@ class TemplatePdfService {
                             fontSize: 9, color: onBg ?? _kLabelGrey)),
                     pw.Text(text,
                         style: pw.TextStyle(
-                          fontSize: f.large ? 13 : 9,
+                          fontSize: f.large ? 12 : 9,
                           fontWeight: f.bold
                               ? pw.FontWeight.bold
                               : pw.FontWeight.normal,
@@ -798,7 +867,7 @@ class TemplatePdfService {
               : pw.Text(
                   text,
                   style: pw.TextStyle(
-                    fontSize: f.large ? 14 : 9,
+                    fontSize: f.large ? 12 : 9,
                     fontWeight:
                         f.bold ? pw.FontWeight.bold : pw.FontWeight.normal,
                     color: fgColor,
@@ -846,7 +915,7 @@ class TemplatePdfService {
                         style: const pw.TextStyle(fontSize: 9, color: _kLabelGrey)),
                     pw.Text(text,
                         style: pw.TextStyle(
-                          fontSize: f.large ? 13 : 9,
+                          fontSize: f.large ? 12 : 9,
                           fontWeight: f.bold
                               ? pw.FontWeight.bold
                               : pw.FontWeight.normal,
@@ -859,7 +928,7 @@ class TemplatePdfService {
               : pw.Text(
                   text,
                   style: pw.TextStyle(
-                    fontSize: f.large ? 14 : 9,
+                    fontSize: f.large ? 12 : 9,
                     fontWeight:
                         f.bold ? pw.FontWeight.bold : pw.FontWeight.normal,
                     color: f.textColor != null
@@ -917,13 +986,6 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('PRESTATIONS',
-            style: pw.TextStyle(
-                fontSize: 7,
-                fontWeight: pw.FontWeight.bold,
-                color: _kLabelGrey,
-                letterSpacing: 0.8)),
-        pw.SizedBox(height: 6),
         pw.Table(
           border: pw.TableBorder.all(color: _kDivider, width: 0.5),
           columnWidths: const {
@@ -965,13 +1027,6 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('PRESTATIONS',
-            style: pw.TextStyle(
-                fontSize: 7,
-                fontWeight: pw.FontWeight.bold,
-                color: _kLabelGrey,
-                letterSpacing: 0.8)),
-        pw.SizedBox(height: 6),
         pw.Table(
           border: pw.TableBorder.all(color: _kDivider, width: 0.5),
           columnWidths: colWidths,
@@ -1042,10 +1097,10 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
     }
 
     return pw.Container(
-      padding: const pw.EdgeInsets.all(14),
+      padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 10),
       decoration: pw.BoxDecoration(
         border: pw.Border.all(color: _kDivider, width: 0.5),
-        borderRadius: pw.BorderRadius.circular(8),
+        borderRadius: pw.BorderRadius.circular(6),
       ),
       child: pw.Row(
         children: [
@@ -1094,12 +1149,12 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
         pw.Text(label,
-            style: const pw.TextStyle(fontSize: 8, color: _kLabelGrey),
+            style: const pw.TextStyle(fontSize: 7, color: _kLabelGrey),
             textAlign: pw.TextAlign.center),
         pw.SizedBox(height: 3),
         pw.Text(value,
             style: pw.TextStyle(
-              fontSize: large ? 13 : 11,
+              fontSize: large ? 10 : 9,
               fontWeight: pw.FontWeight.bold,
               color: color,
             ),
@@ -1110,12 +1165,13 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
 
   static pw.Widget _vDivider() => pw.Container(
         width: 0.5,
-        height: 36,
+        height: 34,
         color: _kDivider,
         margin: const pw.EdgeInsets.symmetric(horizontal: 6),
       );
 
   static pw.Widget _paymentsTable(_RenderCtx c) {
+    final hasMethod = c.payments.any((p) => p.paymentMethodLabel.isNotEmpty);
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -1128,11 +1184,19 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
         pw.SizedBox(height: 6),
         pw.Table(
           border: pw.TableBorder.all(color: _kDivider, width: 0.5),
-          columnWidths: const {
-            0: pw.FlexColumnWidth(2),
-            1: pw.FlexColumnWidth(2.5),
-            2: pw.FlexColumnWidth(3),
-          },
+          columnWidths: hasMethod
+              ? const {
+                  0: pw.FlexColumnWidth(1.8),
+                  1: pw.FlexColumnWidth(2),
+                  2: pw.FlexColumnWidth(2),
+                  3: pw.FlexColumnWidth(1.8),
+                  4: pw.FlexColumnWidth(2),
+                }
+              : const {
+                  0: pw.FlexColumnWidth(2),
+                  1: pw.FlexColumnWidth(2.5),
+                  2: pw.FlexColumnWidth(3),
+                },
           children: [
             pw.TableRow(
               decoration: const pw.BoxDecoration(
@@ -1140,12 +1204,20 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
               children: [
                 _tCell('Date', header: true),
                 _tCell('Montant', header: true),
+                if (hasMethod) ...[
+                  _tCell('Moyen', header: true),
+                  _tCell('Réf.', header: true),
+                ],
                 _tCell('Note', header: true),
               ],
             ),
             ...c.payments.map((p) => pw.TableRow(children: [
                   _tCell(_fmtDate(p.paidAt)),
                   _tCell(CurrencyFormatter.format(p.amount)),
+                  if (hasMethod) ...[
+                    _tCell(p.paymentMethodLabel.isNotEmpty ? p.paymentMethodLabel : '—'),
+                    _tCell(p.paymentReference.isNotEmpty ? p.paymentReference : '—'),
+                  ],
                   _tCell(p.note),
                 ])),
           ],
@@ -1158,59 +1230,57 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
     final methods = _getPaymentMethods(c.template, c.profile);
     if (methods.isEmpty) return pw.SizedBox();
 
-    final chips = methods.asMap().entries.map((entry) {
-      final i = entry.key;
-      final m = entry.value;
+    final chips = methods.map((m) {
       final brandColor = _c(m.type.color.value);
-      return pw.Expanded(
-        child: pw.Container(
-          margin: pw.EdgeInsets.only(left: i == 0 ? 0 : 6),
-          padding: const pw.EdgeInsets.all(8),
-          decoration: pw.BoxDecoration(
-            color: const PdfColor.fromInt(0xFFF8F9FA),
-            borderRadius: pw.BorderRadius.circular(6),
-            border: pw.Border.all(color: _kDivider, width: 0.5),
+      final fieldEntries =
+          m.fields.entries.where((e) => e.value.isNotEmpty).toList();
+      final firstField =
+          fieldEntries.isEmpty ? null : fieldEntries.first.value;
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(right: 5, bottom: 4),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: pw.BoxDecoration(
+          color: _blendOnWhite(brandColor, 0.08),
+          borderRadius: pw.BorderRadius.circular(4),
+          border: pw.Border.all(
+            color: _blendOnWhite(brandColor, 0.3),
+            width: 0.5,
           ),
-          child: pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              if (c.pmLogos.containsKey(m.id)) ...[
-                pw.Container(
-                  width: 20,
-                  height: 20,
-                  child: pw.Image(c.pmLogos[m.id]!, fit: pw.BoxFit.contain),
-                ),
-                pw.SizedBox(width: 6),
-              ] else ...[
-                pw.Container(
-                  width: 8,
-                  height: 8,
-                  decoration: pw.BoxDecoration(
-                    color: brandColor,
-                    shape: pw.BoxShape.circle,
-                  ),
-                ),
-                pw.SizedBox(width: 6),
-              ],
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(m.label,
-                        style: pw.TextStyle(
-                            fontSize: 9,
-                            fontWeight: pw.FontWeight.bold,
-                            color: brandColor)),
-                    ...m.fields.entries
-                        .where((e) => e.value.isNotEmpty)
-                        .map((e) => pw.Text(e.value,
-                            style: const pw.TextStyle(
-                                fontSize: 8, color: _kTextGrey))),
-                  ],
+        ),
+        child: pw.Row(
+          mainAxisSize: pw.MainAxisSize.min,
+          children: [
+            if (c.pmLogos.containsKey(m.id))
+              pw.Container(
+                width: 14,
+                height: 14,
+                child: pw.Image(c.pmLogos[m.id]!, fit: pw.BoxFit.contain),
+              )
+            else
+              pw.Container(
+                width: 8,
+                height: 8,
+                decoration: pw.BoxDecoration(
+                  color: brandColor,
+                  shape: pw.BoxShape.circle,
                 ),
               ),
-            ],
-          ),
+            pw.SizedBox(width: 4),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(m.label,
+                    style: pw.TextStyle(
+                        fontSize: 8,
+                        fontWeight: pw.FontWeight.bold,
+                        color: brandColor)),
+                if (firstField != null)
+                  pw.Text(firstField,
+                      style: const pw.TextStyle(
+                          fontSize: 7, color: _kTextGrey)),
+              ],
+            ),
+          ],
         ),
       );
     }).toList();
@@ -1218,17 +1288,14 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('MOYENS DE PAIEMENT ACCEPTÉS',
+        pw.Text('PAIEMENT',
             style: pw.TextStyle(
                 fontSize: 7,
                 fontWeight: pw.FontWeight.bold,
                 color: _kLabelGrey,
                 letterSpacing: 0.8)),
-        pw.SizedBox(height: 6),
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: chips,
-        ),
+        pw.SizedBox(height: 5),
+        pw.Wrap(children: chips),
       ],
     );
   }
@@ -1249,7 +1316,11 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
               padding: const pw.EdgeInsets.only(bottom: 2),
               child: pw.Text(
                 text,
-                style: const pw.TextStyle(fontSize: 9, color: _kTextGrey),
+                style: pw.TextStyle(
+                  fontSize: f.large ? 11 : 8,
+                  fontWeight: f.bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                  color: f.textColor != null ? _c(f.textColor!) : _kTextGrey,
+                ),
                 textAlign: pw.TextAlign.center,
               ),
             );
@@ -1321,9 +1392,7 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
     return luminance < 0.5;
   }
 
-  static bool _showCustomTable(_RenderCtx c) =>
-      (c.invoice.globalPrice == null || c.invoice.globalPrice! <= 0) &&
-      c.template.customTable.rowCount > 0;
+  static bool _showCustomTable(_RenderCtx c) => false;
 
   static String _invoiceNum(_RenderCtx c) =>
       'N° FAC-${c.invoice.createdAt.year}-${c.invoice.id.substring(0, 6).toUpperCase()}';
@@ -1391,11 +1460,29 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
   // ── Constants ─────────────────────────────────────────────────────────────
   static const _kTextDark = PdfColor.fromInt(0xFF202124);
   static const _kTextGrey = PdfColor.fromInt(0xFF5F6368);
-  static const _kLabelGrey = PdfColor.fromInt(0xFF9AA0A6);
+  static const _kLabelGrey = PdfColor.fromInt(0xFF80868B);
   static const _kDivider = PdfColor.fromInt(0xFFE8EAED);
   static const _kGreen = PdfColor.fromInt(0xFF34A853);
   static const _kRed = PdfColor.fromInt(0xFFEA4335);
   static const _kOrange = PdfColor.fromInt(0xFFF9AB00);
+
+  static pw.Widget _hpad(pw.Widget child) =>
+      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 40), child: child);
+
+  // Pré-calcule le mélange fg sur fond blanc à une opacité donnée.
+  static PdfColor _blendOnWhite(PdfColor c, double opacity) => PdfColor(
+        c.red * opacity + (1 - opacity),
+        c.green * opacity + (1 - opacity),
+        c.blue * opacity + (1 - opacity),
+      );
+
+  // Pré-calcule le mélange fg sur un fond coloré à une opacité donnée.
+  static PdfColor _blendOnColor(PdfColor bg, PdfColor fg, double opacity) =>
+      PdfColor(
+        fg.red * opacity + bg.red * (1 - opacity),
+        fg.green * opacity + bg.green * (1 - opacity),
+        fg.blue * opacity + bg.blue * (1 - opacity),
+      );
 }
 
 // ── Render context (groups all parameters) ────────────────────────────────────

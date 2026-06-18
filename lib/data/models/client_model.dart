@@ -4,6 +4,7 @@ class ClientModel {
   final String name;
   final String phone;
   final String email;
+  final String address;
   final String note;
   final DateTime createdAt;
 
@@ -13,6 +14,7 @@ class ClientModel {
     required this.name,
     required this.phone,
     this.email = '',
+    this.address = '',
     this.note = '',
     required this.createdAt,
   });
@@ -24,6 +26,7 @@ class ClientModel {
       name: map['name'] as String? ?? '',
       phone: map['phone'] as String? ?? '',
       email: map['email'] as String? ?? '',
+      address: map['address'] as String? ?? '',
       note: map['note'] as String? ?? '',
       createdAt: DateTime.fromMillisecondsSinceEpoch(
         map['createdAt'] as int? ?? 0,
@@ -37,6 +40,7 @@ class ClientModel {
       'name': name,
       'phone': phone,
       'email': email,
+      'address': address,
       'note': note,
       'createdAt': createdAt.millisecondsSinceEpoch,
     };
@@ -46,6 +50,7 @@ class ClientModel {
     String? name,
     String? phone,
     String? email,
+    String? address,
     String? note,
   }) {
     return ClientModel(
@@ -54,6 +59,7 @@ class ClientModel {
       name: name ?? this.name,
       phone: phone ?? this.phone,
       email: email ?? this.email,
+      address: address ?? this.address,
       note: note ?? this.note,
       createdAt: createdAt,
     );

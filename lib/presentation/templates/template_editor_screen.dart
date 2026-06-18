@@ -214,6 +214,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
                                   accent: accent,
                                   headerBg: headerBg,
                                   profile: profile,
+                                  logoPath: prov.profile.logoPath,
                                   selectedSection: _selectedSection,
                                   onSectionTap: _onSectionTap,
                                   onFieldTap: _onInlineFieldTap,

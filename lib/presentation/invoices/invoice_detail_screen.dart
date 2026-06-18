@@ -19,6 +19,7 @@ import '../../data/models/invoice_template_model.dart';
 import '../../services/pdf_service.dart';
 import '../../services/template_pdf_service.dart';
 import '../../services/word_service.dart';
+import '../templates/template_preview_screen.dart';
 import 'invoices_screen.dart' show statusLabel;
 
 // ── Point d'entrée ─────────────────────────────────────────────────────────────
@@ -64,7 +65,10 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
 
   InvoiceModel get invoice => widget.invoice;
 
-  Future<InvoiceTemplateModel?> _pickTemplate() async {
+  Future<InvoiceTemplateModel?> _pickTemplate({
+    String confirmLabel = 'Valider le template',
+    IconData confirmIcon = Icons.check_circle_outline,
+  }) async {
     final templateProv = context.read<InvoiceTemplateProvider>();
     final preSelected = invoice.templateId != null
         ? templateProv.allTemplates.firstWhere(
@@ -78,25 +82,28 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => _TemplatePickerSheet(
-          provider: templateProv, initial: preSelected),
+        provider: templateProv,
+        initial: preSelected,
+        confirmLabel: confirmLabel,
+        confirmIcon: confirmIcon,
+      ),
     );
   }
 
-  InvoiceTemplateModel _resolveTemplate() {
-    final prov = context.read<InvoiceTemplateProvider>();
-    if (invoice.templateId != null) {
-      final found = prov.findById(invoice.templateId!);
-      if (found != null) return found;
-    }
-    // Aucun template assigné : préférer le premier template perso, sinon le défaut
-    if (prov.userTemplates.isNotEmpty) return prov.userTemplates.first;
-    return prov.defaultTemplate;
-  }
-
   Future<void> _exportPdf() async {
+    final picked = await _pickTemplate(
+      confirmLabel: 'Générer le PDF',
+      confirmIcon: Icons.picture_as_pdf_outlined,
+    );
+    if (!mounted || picked == null) return;
+    await context.read<InvoiceProvider>().updateInvoice(
+          invoice.copyWith(templateId: picked.id),
+        );
+    if (!mounted) return;
+    final template = picked;
+
     setState(() => _exportingPdf = true);
     final messenger = ScaffoldMessenger.of(context);
-    final template = _resolveTemplate();
     final clientProv = context.read<ClientProvider>();
     final paymentProv = context.read<PaymentProvider>();
     final profile = context.read<BusinessProfileProvider>().profile;
@@ -111,7 +118,7 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
         profile: profile,
         clientPhone: client?.phone,
         clientEmail: client?.email,
-        clientAddress: null,
+        clientAddress: client?.address,
       );
       await PdfService.sharePdf(
         bytes,
@@ -127,6 +134,17 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
   }
 
   Future<void> _exportWord() async {
+    final picked = await _pickTemplate(
+      confirmLabel: 'Générer le document Word',
+      confirmIcon: Icons.article_outlined,
+    );
+    if (!mounted || picked == null) return;
+    await context.read<InvoiceProvider>().updateInvoice(
+          invoice.copyWith(templateId: picked.id),
+        );
+    if (!mounted) return;
+    final template = picked;
+
     setState(() => _exportingWord = true);
     final messenger = ScaffoldMessenger.of(context);
     final clientProv = context.read<ClientProvider>();
@@ -140,8 +158,10 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
         invoice: invoice,
         payments: payments,
         profile: profile,
+        template: template,
         clientPhone: client?.phone,
         clientEmail: client?.email,
+        clientAddress: client?.address,
       );
     } catch (e) {
       if (mounted) {
@@ -975,7 +995,14 @@ class _ActionButton extends StatelessWidget {
 class _TemplatePickerSheet extends StatefulWidget {
   final InvoiceTemplateProvider provider;
   final InvoiceTemplateModel? initial;
-  const _TemplatePickerSheet({required this.provider, this.initial});
+  final String confirmLabel;
+  final IconData confirmIcon;
+  const _TemplatePickerSheet({
+    required this.provider,
+    this.initial,
+    this.confirmLabel = 'Valider le template',
+    this.confirmIcon = Icons.check_circle_outline,
+  });
 
   @override
   State<_TemplatePickerSheet> createState() => _TemplatePickerSheetState();
@@ -1078,8 +1105,33 @@ class _TemplatePickerSheetState extends State<_TemplatePickerSheet> {
                             ],
                           ),
                         ),
-                        if (isSelected)
-                          Icon(Icons.check_circle, color: accent),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  TemplatePreviewScreen(template: t),
+                            ),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: accent.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Aperçu',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: accent,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        if (isSelected) Icon(Icons.check_circle, color: accent),
                       ],
                     ),
                   ),
@@ -1094,10 +1146,10 @@ class _TemplatePickerSheetState extends State<_TemplatePickerSheet> {
               height: 52,
               child: ElevatedButton.icon(
                 onPressed: () => Navigator.pop(context, _selected),
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: const Text(
-                  'Générer PDF',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                icon: Icon(widget.confirmIcon),
+                label: Text(
+                  widget.confirmLabel,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1A73E8),

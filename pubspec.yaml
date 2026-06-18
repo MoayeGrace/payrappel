@@ -57,6 +57,9 @@ dependencies:
   # Sélection d'image (logo entreprise)
   image_picker: ^1.1.2
 
+  # Polices Google
+  google_fonts: ^6.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

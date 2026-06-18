@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/business_profile_model.dart';
 import '../../data/models/invoice_template_model.dart';
@@ -111,11 +113,14 @@ class TemplatePreviewScreen extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                   child: Consumer<BusinessProfileProvider>(
+                    
+
                     builder: (_, prov, __) => InvoiceDocPreview(
                       template: template,
                       accent: accent,
                       headerBg: headerBg,
                       profile: PreviewProfile.from(prov.profile),
+                      logoPath: prov.profile.logoPath,
                       paymentMethods: prov.profile.paymentMethods
                           .where((m) => m.isEnabled)
                           .toList(),
@@ -494,6 +499,7 @@ class InvoiceDocPreview extends StatelessWidget {
   final Color accent;
   final Color headerBg;
   final PreviewProfile profile;
+  final String? logoPath;
   final double elevation;
   final TemplateSectionId? selectedSection;
   final ValueChanged<TemplateSectionId?>? onSectionTap;
@@ -510,6 +516,7 @@ class InvoiceDocPreview extends StatelessWidget {
     required this.accent,
     required this.headerBg,
     required this.profile,
+    this.logoPath,
     this.elevation = 6,
     this.selectedSection,
     this.onSectionTap,
@@ -523,16 +530,19 @@ class InvoiceDocPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: elevation,
-      borderRadius: BorderRadius.circular(4),
-      child: ClipRRect(
+    return DefaultTextStyle(
+      style: GoogleFonts.poppins(),
+      child: Material(
+        elevation: elevation,
+        borderRadius: BorderRadius.circular(4),
+        child: ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: switch (template.layout) {
           TemplateLayout.classic => _ClassicDoc(
               accent: accent,
               template: template,
               profile: profile,
+              logoPath: logoPath,
               selectedSection: selectedSection,
               onSectionTap: onSectionTap,
               paymentMethods: paymentMethods,
@@ -547,6 +557,7 @@ class InvoiceDocPreview extends StatelessWidget {
               headerBg: headerBg,
               template: template,
               profile: profile,
+              logoPath: logoPath,
               selectedSection: selectedSection,
               onSectionTap: onSectionTap,
               paymentMethods: paymentMethods,
@@ -560,6 +571,7 @@ class InvoiceDocPreview extends StatelessWidget {
               accent: accent,
               template: template,
               profile: profile,
+              logoPath: logoPath,
               selectedSection: selectedSection,
               onSectionTap: onSectionTap,
               paymentMethods: paymentMethods,
@@ -574,6 +586,7 @@ class InvoiceDocPreview extends StatelessWidget {
               headerBg: headerBg,
               template: template,
               profile: profile,
+              logoPath: logoPath,
               selectedSection: selectedSection,
               onSectionTap: onSectionTap,
               paymentMethods: paymentMethods,
@@ -585,6 +598,7 @@ class InvoiceDocPreview extends StatelessWidget {
             ),
         },
       ),
+    ),
     );
   }
 }
@@ -595,6 +609,7 @@ class _ClassicDoc extends StatelessWidget {
   final Color accent;
   final InvoiceTemplateModel template;
   final PreviewProfile profile;
+  final String? logoPath;
   final TemplateSectionId? selectedSection;
   final ValueChanged<TemplateSectionId?>? onSectionTap;
   final List<PaymentMethodModel> paymentMethods;
@@ -608,6 +623,7 @@ class _ClassicDoc extends StatelessWidget {
     required this.accent,
     required this.template,
     required this.profile,
+    this.logoPath,
     this.selectedSection,
     this.onSectionTap,
     this.paymentMethods = const [],
@@ -675,7 +691,17 @@ class _ClassicDoc extends StatelessWidget {
                               color: accent.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(5),
                             ),
-                            child: Icon(Icons.business_outlined, color: accent, size: 20),
+                            child: logoPath != null && logoPath!.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(5),
+                                    child: Image.file(
+                                      File(logoPath!),
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) =>
+                                          Icon(Icons.business_outlined, color: accent, size: 20),
+                                    ),
+                                  )
+                                : Icon(Icons.business_outlined, color: accent, size: 20),
                           ),
                           const SizedBox(width: 8),
                         ],
@@ -791,25 +817,27 @@ class _ClassicDoc extends StatelessWidget {
                             onFieldTap: onFieldTap),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _SelectableZone(
-                    id: TemplateSectionId.bottomRight,
-                    selected: selectedSection,
-                    onTap: onSectionTap,
-                    onSectionSwap: onSectionSwap,
-                    onAddField: onAddField != null
-                        ? () => onAddField!(TemplateSectionId.bottomRight)
-                        : null,
-                    child: template.bottomRight.isEmpty
-                        ? _customFieldsBox(accent)
-                        : _renderSection(template.bottomRight, profile,
-                            boldColor: const Color(0xFF202124),
-                            baseFontSize: 9,
-                            sectionId: TemplateSectionId.bottomRight,
-                            onFieldTap: onFieldTap),
+                if (!template.bottomRight.isEmpty || onSectionTap != null) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _SelectableZone(
+                      id: TemplateSectionId.bottomRight,
+                      selected: selectedSection,
+                      onTap: onSectionTap,
+                      onSectionSwap: onSectionSwap,
+                      onAddField: onAddField != null
+                          ? () => onAddField!(TemplateSectionId.bottomRight)
+                          : null,
+                      child: template.bottomRight.isEmpty
+                          ? _customFieldsBox(accent)
+                          : _renderSection(template.bottomRight, profile,
+                              boldColor: const Color(0xFF202124),
+                              baseFontSize: 9,
+                              sectionId: TemplateSectionId.bottomRight,
+                              onFieldTap: onFieldTap),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -856,6 +884,7 @@ class _ModernDoc extends StatelessWidget {
   final Color headerBg;
   final InvoiceTemplateModel template;
   final PreviewProfile profile;
+  final String? logoPath;
   final TemplateSectionId? selectedSection;
   final ValueChanged<TemplateSectionId?>? onSectionTap;
   final List<PaymentMethodModel> paymentMethods;
@@ -870,6 +899,7 @@ class _ModernDoc extends StatelessWidget {
     required this.headerBg,
     required this.template,
     required this.profile,
+    this.logoPath,
     this.selectedSection,
     this.onSectionTap,
     this.paymentMethods = const [],
@@ -900,8 +930,18 @@ class _ModernDoc extends StatelessWidget {
                     color: Colors.white.withOpacity(0.18),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Icon(Icons.business,
-                      color: Colors.white.withOpacity(0.85), size: 22),
+                  child: logoPath != null && logoPath!.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.file(
+                            File(logoPath!),
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Icon(Icons.business,
+                                color: Colors.white.withOpacity(0.85), size: 22),
+                          ),
+                        )
+                      : Icon(Icons.business,
+                          color: Colors.white.withOpacity(0.85), size: 22),
                 ),
                 const SizedBox(width: 10),
               ],
@@ -1038,25 +1078,27 @@ class _ModernDoc extends StatelessWidget {
                                 onFieldTap: onFieldTap),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _SelectableZone(
-                        id: TemplateSectionId.bottomRight,
-                        selected: selectedSection,
-                        onTap: onSectionTap,
-                        onSectionSwap: onSectionSwap,
-                        onAddField: onAddField != null
-                            ? () => onAddField!(TemplateSectionId.bottomRight)
-                            : null,
-                        child: template.bottomRight.isEmpty
-                            ? _customFieldsBox(accent)
-                            : _renderSection(template.bottomRight, profile,
-                                boldColor: const Color(0xFF202124),
-                                baseFontSize: 9,
-                                sectionId: TemplateSectionId.bottomRight,
-                                onFieldTap: onFieldTap),
+                    if (!template.bottomRight.isEmpty || onSectionTap != null) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _SelectableZone(
+                          id: TemplateSectionId.bottomRight,
+                          selected: selectedSection,
+                          onTap: onSectionTap,
+                          onSectionSwap: onSectionSwap,
+                          onAddField: onAddField != null
+                              ? () => onAddField!(TemplateSectionId.bottomRight)
+                              : null,
+                          child: template.bottomRight.isEmpty
+                              ? _customFieldsBox(accent)
+                              : _renderSection(template.bottomRight, profile,
+                                  boldColor: const Color(0xFF202124),
+                                  baseFontSize: 9,
+                                  sectionId: TemplateSectionId.bottomRight,
+                                  onFieldTap: onFieldTap),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -1104,6 +1146,7 @@ class _MinimalDoc extends StatelessWidget {
   final Color accent;
   final InvoiceTemplateModel template;
   final PreviewProfile profile;
+  final String? logoPath;
   final TemplateSectionId? selectedSection;
   final ValueChanged<TemplateSectionId?>? onSectionTap;
   final List<PaymentMethodModel> paymentMethods;
@@ -1117,6 +1160,7 @@ class _MinimalDoc extends StatelessWidget {
     required this.accent,
     required this.template,
     required this.profile,
+    this.logoPath,
     this.selectedSection,
     this.onSectionTap,
     this.paymentMethods = const [],
@@ -1234,25 +1278,27 @@ class _MinimalDoc extends StatelessWidget {
                             onFieldTap: onFieldTap),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _SelectableZone(
-                    id: TemplateSectionId.bottomRight,
-                    selected: selectedSection,
-                    onTap: onSectionTap,
-                    onSectionSwap: onSectionSwap,
-                    onAddField: onAddField != null
-                        ? () => onAddField!(TemplateSectionId.bottomRight)
-                        : null,
-                    child: template.bottomRight.isEmpty
-                        ? _customFieldsBox(accent)
-                        : _renderSection(template.bottomRight, profile,
-                            boldColor: const Color(0xFF202124),
-                            baseFontSize: 9,
-                            sectionId: TemplateSectionId.bottomRight,
-                            onFieldTap: onFieldTap),
+                if (!template.bottomRight.isEmpty || onSectionTap != null) ...[
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _SelectableZone(
+                      id: TemplateSectionId.bottomRight,
+                      selected: selectedSection,
+                      onTap: onSectionTap,
+                      onSectionSwap: onSectionSwap,
+                      onAddField: onAddField != null
+                          ? () => onAddField!(TemplateSectionId.bottomRight)
+                          : null,
+                      child: template.bottomRight.isEmpty
+                          ? _customFieldsBox(accent)
+                          : _renderSection(template.bottomRight, profile,
+                              boldColor: const Color(0xFF202124),
+                              baseFontSize: 9,
+                              sectionId: TemplateSectionId.bottomRight,
+                              onFieldTap: onFieldTap),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -1301,6 +1347,7 @@ class _BoldDoc extends StatelessWidget {
   final Color headerBg;
   final InvoiceTemplateModel template;
   final PreviewProfile profile;
+  final String? logoPath;
   final TemplateSectionId? selectedSection;
   final ValueChanged<TemplateSectionId?>? onSectionTap;
   final List<PaymentMethodModel> paymentMethods;
@@ -1315,6 +1362,7 @@ class _BoldDoc extends StatelessWidget {
     required this.headerBg,
     required this.template,
     required this.profile,
+    this.logoPath,
     this.selectedSection,
     this.onSectionTap,
     this.paymentMethods = const [],
@@ -1343,8 +1391,17 @@ class _BoldDoc extends StatelessWidget {
                   color: Colors.white.withOpacity(0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.business,
-                    color: Colors.white.withOpacity(0.85), size: 22),
+                child: logoPath != null && logoPath!.isNotEmpty
+                    ? ClipOval(
+                        child: Image.file(
+                          File(logoPath!),
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(Icons.business,
+                              color: Colors.white.withOpacity(0.85), size: 22),
+                        ),
+                      )
+                    : Icon(Icons.business,
+                        color: Colors.white.withOpacity(0.85), size: 22),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1452,25 +1509,27 @@ class _BoldDoc extends StatelessWidget {
                                 onFieldTap: onFieldTap),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _SelectableZone(
-                        id: TemplateSectionId.bottomRight,
-                        selected: selectedSection,
-                        onTap: onSectionTap,
-                        onSectionSwap: onSectionSwap,
-                        onAddField: onAddField != null
-                            ? () => onAddField!(TemplateSectionId.bottomRight)
-                            : null,
-                        child: template.bottomRight.isEmpty
-                            ? _customFieldsBox(accent)
-                            : _renderSection(template.bottomRight, profile,
-                                boldColor: const Color(0xFF202124),
-                                baseFontSize: 9,
-                                sectionId: TemplateSectionId.bottomRight,
-                                onFieldTap: onFieldTap),
+                    if (!template.bottomRight.isEmpty || onSectionTap != null) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _SelectableZone(
+                          id: TemplateSectionId.bottomRight,
+                          selected: selectedSection,
+                          onTap: onSectionTap,
+                          onSectionSwap: onSectionSwap,
+                          onAddField: onAddField != null
+                              ? () => onAddField!(TemplateSectionId.bottomRight)
+                              : null,
+                          child: template.bottomRight.isEmpty
+                              ? _customFieldsBox(accent)
+                              : _renderSection(template.bottomRight, profile,
+                                  boldColor: const Color(0xFF202124),
+                                  baseFontSize: 9,
+                                  sectionId: TemplateSectionId.bottomRight,
+                                  onFieldTap: onFieldTap),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -1601,17 +1660,7 @@ Widget _paymentMethodsBlock(
               border: Border.all(color: color.withOpacity(0.3), width: 0.5),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              if (m.type.assetPath != null)
-                Image.asset(
-                  m.type.assetPath!,
-                  width: 12,
-                  height: 12,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) =>
-                      Icon(m.type.icon, size: 9, color: color),
-                )
-              else
-                Icon(m.type.icon, size: 9, color: color),
+              Icon(m.type.icon, size: 10, color: color),
               const SizedBox(width: 3),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(m.label,
@@ -1619,10 +1668,14 @@ Widget _paymentMethodsBlock(
                         fontSize: 7,
                         fontWeight: FontWeight.w700,
                         color: color)),
-                if (m.fields.isNotEmpty && m.fields.values.first.isNotEmpty)
-                  Text(m.fields.values.first,
-                      style: const TextStyle(
-                          fontSize: 5.5, color: Color(0xFF9AA0A6))),
+                if (m.fields.isNotEmpty)
+                  Text(
+                    m.fields.values.first.isNotEmpty
+                        ? m.fields.values.first
+                        : '—',
+                    style: const TextStyle(
+                        fontSize: 5.5, color: Color(0xFF9AA0A6)),
+                  ),
               ]),
             ]),
           );

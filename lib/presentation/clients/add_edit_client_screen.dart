@@ -19,6 +19,7 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _emailCtrl;
+  late final TextEditingController _addressCtrl;
   late final TextEditingController _noteCtrl;
   bool _submitting = false;
 
@@ -30,6 +31,7 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
     _nameCtrl = TextEditingController(text: widget.client?.name ?? '');
     _phoneCtrl = TextEditingController(text: widget.client?.phone ?? '');
     _emailCtrl = TextEditingController(text: widget.client?.email ?? '');
+    _addressCtrl = TextEditingController(text: widget.client?.address ?? '');
     _noteCtrl = TextEditingController(text: widget.client?.note ?? '');
   }
 
@@ -90,6 +92,7 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
+    _addressCtrl.dispose();
     _noteCtrl.dispose();
     super.dispose();
   }
@@ -129,6 +132,7 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
           name: _nameCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
           email: _emailCtrl.text.trim(),
+          address: _addressCtrl.text.trim(),
           note: _noteCtrl.text.trim(),
         );
         await provider.updateClient(updated);
@@ -137,6 +141,7 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
           name: _nameCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
           email: _emailCtrl.text.trim(),
+          address: _addressCtrl.text.trim(),
           note: _noteCtrl.text.trim(),
         );
       }
@@ -265,6 +270,15 @@ class _AddEditClientScreenState extends State<AddEditClientScreen> {
               controller: _emailCtrl,
               decoration: _inputDecoration('Email (optionnel)', Icons.email),
               keyboardType: TextInputType.emailAddress,
+            ),
+
+            const SizedBox(height: AppSizes.paddingMedium),
+
+            // Address
+            TextFormField(
+              controller: _addressCtrl,
+              decoration: _inputDecoration('Adresse (optionnel)', Icons.location_on_outlined),
+              textCapitalization: TextCapitalization.sentences,
             ),
 
             const SizedBox(height: AppSizes.paddingMedium),
