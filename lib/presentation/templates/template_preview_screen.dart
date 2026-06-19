@@ -67,12 +67,17 @@ class TemplatePreviewScreen extends StatelessWidget {
               Navigator.pop(context);
               context.push('/templates/edit', extra: template);
             },
-            icon: Icon(Icons.tune_outlined,
-                color: _contrastColor(accent), size: 18),
-            label: Text('Éditer',
-                style: TextStyle(
-                    color: _contrastColor(accent),
-                    fontWeight: FontWeight.w600)),
+            icon: Icon(
+              template.isBuiltIn ? Icons.copy_outlined : Icons.tune_outlined,
+              color: _contrastColor(accent),
+              size: 18,
+            ),
+            label: Text(
+              template.isBuiltIn ? 'Copier' : 'Éditer',
+              style: TextStyle(
+                  color: _contrastColor(accent),
+                  fontWeight: FontWeight.w600),
+            ),
           ),
           const SizedBox(width: 4),
         ],

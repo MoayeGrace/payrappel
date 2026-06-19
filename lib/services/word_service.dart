@@ -118,6 +118,24 @@ class WordService {
       </tr>''');
     }
 
+    // ── Sections du template ──────────────────────────────────────────────
+    final topLeftHtml = template.topLeft.isEmpty
+        ? null
+        : _renderSectionW(template.topLeft, invoice, profile, clientPhone, clientEmail, clientAddress);
+    final topRightHtml = template.topRight.isEmpty
+        ? null
+        : _renderSectionW(template.topRight, invoice, profile, clientPhone, clientEmail, clientAddress, textAlign: 'right');
+    final topCenterHtml = _renderSectionW(template.topCenter, invoice, profile, clientPhone, clientEmail, clientAddress, textAlign: 'center');
+    final bottomLeftHtml = template.bottomLeft.isEmpty
+        ? null
+        : _renderSectionW(template.bottomLeft, invoice, profile, clientPhone, clientEmail, clientAddress);
+    final bottomRightHtml = template.bottomRight.isEmpty
+        ? ''
+        : _renderSectionW(template.bottomRight, invoice, profile, clientPhone, clientEmail, clientAddress);
+    final bottomCenterHtml = template.bottomCenter.isEmpty
+        ? null
+        : _renderSectionW(template.bottomCenter, invoice, profile, clientPhone, clientEmail, clientAddress, textAlign: 'center');
+
     final footerText = _esc(profile.footerText.isNotEmpty
         ? profile.footerText
         : 'Merci pour votre confiance.');
@@ -132,6 +150,7 @@ class WordService {
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td style="vertical-align:top;">
+            ${topLeftHtml ?? '''
             <div style="font-size:14pt;font-weight:bold;color:$onHeader;">
               ${_esc(profile.companyName)}
             </div>
@@ -139,8 +158,10 @@ class WordService {
             ${profile.phone.isNotEmpty ? '<div style="font-size:9pt;color:$onHeaderMuted;">${_esc(profile.phone)}</div>' : ''}
             ${profile.email.isNotEmpty ? '<div style="font-size:9pt;color:$onHeaderMuted;">${_esc(profile.email)}</div>' : ''}
             ${profile.rccm.isNotEmpty ? '<div style="font-size:9pt;color:$onHeaderMuted;">${_esc(profile.rccm)}</div>' : ''}
+            '''}
           </td>
           <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:20px;">
+            ${topRightHtml ?? '''
             <div style="font-size:18pt;font-weight:bold;letter-spacing:2px;color:$onHeader;">
               ${_esc(template.titleLabel)}
             </div>
@@ -153,6 +174,7 @@ class WordService {
             <div style="font-size:9pt;color:$onHeaderMuted;">
               Ech : ${DateFormatter.format(invoice.dueDate)}
             </div>
+            '''}
           </td>
         </tr>
       </table>
@@ -177,6 +199,7 @@ class WordService {
             </div>
           </td>
           <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:20px;">
+            ${topRightHtml ?? '''
             <div style="font-size:9pt;font-weight:bold;color:$onHeader;">
               ${_esc(invoice.title)}
             </div>
@@ -189,6 +212,7 @@ class WordService {
             <div style="font-size:8pt;color:$onHeaderMuted;">
               Ech. ${DateFormatter.format(invoice.dueDate)}
             </div>
+            '''}
           </td>
         </tr>
       </table>
@@ -206,6 +230,7 @@ class WordService {
              style="background-color:$accentLightHex;border-radius:6px;">
         <tr>
           <td style="vertical-align:top;" width="60%">
+            ${topLeftHtml ?? '''
             <div style="font-size:13pt;font-weight:bold;color:#202124;">
               ${_esc(profile.companyName)}
             </div>
@@ -213,8 +238,10 @@ class WordService {
             ${profile.phone.isNotEmpty ? '<div style="font-size:9pt;color:#5F6368;">${_esc(profile.phone)}</div>' : ''}
             ${profile.email.isNotEmpty ? '<div style="font-size:9pt;color:#5F6368;">${_esc(profile.email)}</div>' : ''}
             ${profile.rccm.isNotEmpty ? '<div style="font-size:9pt;color:#5F6368;">${_esc(profile.rccm)}</div>' : ''}
+            '''}
           </td>
           <td style="vertical-align:top;text-align:right;" width="40%">
+            ${topRightHtml ?? '''
             <div style="display:inline-block;background-color:$accentHex;color:#FFFFFF;
                         font-size:10pt;font-weight:bold;letter-spacing:1px;
                         padding:4px 10px;border-radius:4px;">
@@ -229,6 +256,7 @@ class WordService {
             <div style="font-size:9pt;color:#9AA0A6;">
               Echeance : ${DateFormatter.format(invoice.dueDate)}
             </div>
+            '''}
           </td>
         </tr>
       </table>
@@ -243,13 +271,16 @@ class WordService {
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td style="vertical-align:top;">
+            ${topLeftHtml ?? '''
             <div style="font-size:15pt;font-weight:bold;color:#202124;">
               ${_esc(profile.companyName)}
             </div>
             ${profile.phone.isNotEmpty ? '<div style="font-size:9pt;color:#5F6368;margin-top:2px;">${_esc(profile.phone)}</div>' : ''}
             ${profile.email.isNotEmpty ? '<div style="font-size:9pt;color:#5F6368;">${_esc(profile.email)}</div>' : ''}
+            '''}
           </td>
           <td style="vertical-align:top;text-align:right;padding-left:20px;white-space:nowrap;">
+            ${topRightHtml ?? '''
             <div style="font-size:18pt;font-weight:bold;letter-spacing:2px;color:$accentHex;">
               ${_esc(template.titleLabel)}
             </div>
@@ -262,6 +293,7 @@ class WordService {
             <div style="font-size:9pt;color:#9AA0A6;">
               Ech : ${DateFormatter.format(invoice.dueDate)}
             </div>
+            '''}
           </td>
         </tr>
       </table>
@@ -293,6 +325,7 @@ class WordService {
 <div class="page">
 
 $headerHtml
+${topCenterHtml.isEmpty ? '' : '<div style="padding:8px 24px 0;text-align:center;">$topCenterHtml</div>'}
 
 <!-- ── Section client ───────────────────────────────────────────────────── -->
 <table width="100%" cellpadding="0" cellspacing="0">
@@ -302,6 +335,7 @@ $headerHtml
         <tr>
           <td width="48%" bgcolor="#f8f9fa"
               style="background-color:#f8f9fa;padding:12px 14px;vertical-align:top;">
+            ${bottomLeftHtml ?? '''
             <div style="font-size:7pt;font-weight:bold;color:#9AA0A6;letter-spacing:1px;">
               CLIENT
             </div>
@@ -311,9 +345,10 @@ $headerHtml
             ${clientAddress.isNotEmpty ? '<div style="font-size:10pt;color:#5F6368;margin-top:3px;">${_esc(clientAddress)}</div>' : ''}
             ${clientPhone.isNotEmpty ? '<div style="font-size:10pt;color:#5F6368;margin-top:2px;">${_esc(clientPhone)}</div>' : ''}
             ${clientEmail.isNotEmpty ? '<div style="font-size:10pt;color:#5F6368;margin-top:2px;">${_esc(clientEmail)}</div>' : ''}
+            '''}
           </td>
           <td width="4%"></td>
-          <td width="48%"></td>
+          <td width="48%" style="vertical-align:top;">$bottomRightHtml</td>
         </tr>
       </table>
     </td>
@@ -406,7 +441,7 @@ ${payments.isNotEmpty ? '''
   <tr>
     <td style="padding:28px 24px 20px;text-align:center;
                border-top:1px solid #e8eaed;margin-top:24px;">
-      <div style="font-size:10pt;color:#9AA0A6;">$footerText</div>
+      ${bottomCenterHtml ?? '<div style="font-size:10pt;color:#9AA0A6;">$footerText</div>'}
       <div style="font-size:8pt;color:#BDC1C6;margin-top:5px;">
         Document genere par PayRappel
       </div>
@@ -451,4 +486,87 @@ ${payments.isNotEmpty ? '''
       .replaceAll('<', '&lt;')
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;');
+
+  static String _resolveFieldW(
+    TemplateFieldConfig f,
+    InvoiceModel invoice,
+    BusinessProfileModel profile,
+    String phone,
+    String email,
+    String address,
+  ) {
+    switch (f.source) {
+      case FieldSource.companyName:
+        return profile.companyName;
+      case FieldSource.companyAddress:
+        return profile.address;
+      case FieldSource.companyPhone:
+        return profile.phone;
+      case FieldSource.companyEmail:
+        return profile.email;
+      case FieldSource.companyRccm:
+        return profile.rccm.isNotEmpty ? 'RCCM: ${profile.rccm}' : '';
+      case FieldSource.clientName:
+        return invoice.clientName;
+      case FieldSource.clientAddress:
+        return address;
+      case FieldSource.clientPhone:
+        return phone;
+      case FieldSource.clientEmail:
+        return email;
+      case FieldSource.invoiceTitle:
+        return invoice.title;
+      case FieldSource.invoiceDate:
+        return DateFormatter.format(invoice.createdAt);
+      case FieldSource.invoiceDueDate:
+        return DateFormatter.format(invoice.dueDate);
+      case FieldSource.invoiceStatus:
+        return switch (invoice.status) {
+          InvoiceStatus.draft => 'Brouillon',
+          InvoiceStatus.paid => 'Payée',
+          InvoiceStatus.partial => 'Partiellement payée',
+          InvoiceStatus.late => 'En retard',
+        };
+      case FieldSource.bankInfo:
+        final parts = [
+          if (profile.bankName.isNotEmpty) profile.bankName,
+          if (profile.bankAccount.isNotEmpty) profile.bankAccount,
+        ];
+        return parts.join(' — ');
+      case FieldSource.invoiceNumber:
+        return 'N° FAC-${invoice.createdAt.year}-${invoice.id.substring(0, 6).toUpperCase()}';
+      case FieldSource.manual:
+        return f.manualValue ?? '';
+    }
+  }
+
+  static String _renderSectionW(
+    TemplateSectionModel section,
+    InvoiceModel invoice,
+    BusinessProfileModel profile,
+    String phone,
+    String email,
+    String address, {
+    String baseColor = '#5F6368',
+    String boldColor = '#202124',
+    String textAlign = 'left',
+  }) {
+    if (section.isEmpty) return '';
+    final buf = StringBuffer();
+    for (final f in section.fields) {
+      final raw = _resolveFieldW(f, invoice, profile, phone, email, address);
+      if (raw.isEmpty) continue;
+      final color = f.textColor != null ? _hex(f.textColor!) : (f.bold ? boldColor : baseColor);
+      final weight = f.bold ? 'bold' : 'normal';
+      final size = f.large ? '13pt' : '10pt';
+      final labelPart = (f.label != null && f.label!.isNotEmpty)
+          ? '<span style="color:#9AA0A6;font-weight:normal;">${_esc(f.label!)}: </span>'
+          : '';
+      buf.write(
+        '<div style="font-size:$size;font-weight:$weight;color:$color;'
+        'text-align:$textAlign;margin-bottom:2px;">$labelPart${_esc(raw)}</div>',
+      );
+    }
+    return buf.toString();
+  }
 }

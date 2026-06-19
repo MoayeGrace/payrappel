@@ -80,13 +80,21 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
       return;
     }
     setState(() => _saving = true);
+    final wasBuiltIn = _template.isBuiltIn;
     try {
-      await context
+      final saved = await context
           .read<InvoiceTemplateProvider>()
           .saveCustomTemplate(_template.copyWith(name: name));
       if (mounted) {
+        // After saving a built-in, switch the editor state to the copy so
+        // auto-save and future manual saves will update the copy, not create another.
+        if (wasBuiltIn) setState(() => _template = saved);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Template enregistré')),
+          SnackBar(
+            content: Text(wasBuiltIn
+                ? 'Copie enregistrée dans Mes templates'
+                : 'Template enregistré'),
+          ),
         );
         Navigator.of(context).pop();
       }

@@ -240,7 +240,7 @@ class _TemplateCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // Bandeau bas : "Aperçu" (tap principal) | icône édition rapide
+                  // Bandeau bas : "Aperçu" (tap principal) | icône action
                   Positioned(
                     left: 0,
                     right: 0,
@@ -262,8 +262,13 @@ class _TemplateCard extends StatelessWidget {
                           const SizedBox(width: 6),
                           GestureDetector(
                             onTap: onEdit,
-                            child: const Icon(Icons.tune,
-                                color: Colors.white, size: 10),
+                            child: Icon(
+                              template.isBuiltIn
+                                  ? Icons.copy_outlined
+                                  : Icons.tune,
+                              color: Colors.white,
+                              size: 10,
+                            ),
                           ),
                         ],
                       ),
