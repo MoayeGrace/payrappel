@@ -16,6 +16,7 @@ class InvoiceModel {
   final List<Map<String, String>> customFields;
   final String? templateId;
   final List<Map<String, dynamic>> lineItems;
+  final List<Map<String, dynamic>> extraColumns;
   final String notes;
   final double? globalPrice;
 
@@ -35,6 +36,7 @@ class InvoiceModel {
     this.customFields = const [],
     this.templateId,
     this.lineItems = const [],
+    this.extraColumns = const [],
     this.notes = '',
     this.globalPrice,
   });
@@ -78,6 +80,10 @@ class InvoiceModel {
               ?.map((e) => Map<String, dynamic>.from(e as Map))
               .toList() ??
           [],
+      extraColumns: (map['extraColumns'] as List?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          [],
       notes: map['notes'] as String? ?? '',
       globalPrice: (map['globalPrice'] as num?)?.toDouble(),
     );
@@ -99,6 +105,7 @@ class InvoiceModel {
       'customFields': customFields,
       if (templateId != null) 'templateId': templateId,
       if (lineItems.isNotEmpty) 'lineItems': lineItems,
+      if (extraColumns.isNotEmpty) 'extraColumns': extraColumns,
       if (notes.isNotEmpty) 'notes': notes,
       if (globalPrice != null && globalPrice! > 0) 'globalPrice': globalPrice,
     };
@@ -116,6 +123,7 @@ class InvoiceModel {
     String? templateId,
     bool clearTemplateId = false,
     List<Map<String, dynamic>>? lineItems,
+    List<Map<String, dynamic>>? extraColumns,
     String? notes,
     double? globalPrice,
     bool clearGlobalPrice = false,
@@ -136,6 +144,7 @@ class InvoiceModel {
       customFields: customFields ?? this.customFields,
       templateId: clearTemplateId ? null : (templateId ?? this.templateId),
       lineItems: lineItems ?? this.lineItems,
+      extraColumns: extraColumns ?? this.extraColumns,
       notes: notes ?? this.notes,
       globalPrice: clearGlobalPrice ? null : (globalPrice ?? this.globalPrice),
     );

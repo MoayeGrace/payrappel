@@ -68,6 +68,7 @@ class InvoiceRepository {
     required DateTime dueDate,
     List<Map<String, String>> customFields = const [],
     List<Map<String, dynamic>> lineItems = const [],
+    List<Map<String, dynamic>> extraColumns = const [],
     double discountAmount = 0,
     double? globalPrice,
   }) async {
@@ -91,6 +92,7 @@ class InvoiceRepository {
       updatedAt: now,
       customFields: customFields,
       lineItems: lineItems,
+      extraColumns: extraColumns,
       discountAmount: discountAmount,
       globalPrice: globalPrice,
     );

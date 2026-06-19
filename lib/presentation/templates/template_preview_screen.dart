@@ -712,7 +712,7 @@ class _ClassicDoc extends StatelessWidget {
                           const SizedBox(width: 8),
                         ],
                         Expanded(
-                          child: template.topLeft.isEmpty
+                          child: (template.topLeft.isEmpty && onSectionTap == null)
                               ? Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -760,13 +760,13 @@ class _ClassicDoc extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      if (template.topRight.isEmpty) ...[
+                      if (template.topRight.isEmpty && onSectionTap == null) ...[
                         Text('N° FAC-2026-A3B4C5',
                             style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: accent)),
                         const SizedBox(height: 3),
                         _metaRow('Émise le', '01/01/2026'),
                         _metaRow('Échéance', '31/01/2026'),
-                      ] else
+                      ] else if (!template.topRight.isEmpty)
                         _renderSection(template.topRight, profile,
                             baseFontSize: 8,
                             sectionId: TemplateSectionId.topRight,
@@ -793,7 +793,7 @@ class _ClassicDoc extends StatelessWidget {
                     onAddField: onAddField != null
                         ? () => onAddField!(TemplateSectionId.bottomLeft)
                         : null,
-                    child: template.bottomLeft.isEmpty
+                    child: (template.bottomLeft.isEmpty && onSectionTap == null)
                         ? _partyBox(
                             title: 'CLIENT',
                             name: 'Jean Dupont',
@@ -818,7 +818,7 @@ class _ClassicDoc extends StatelessWidget {
                       onAddField: onAddField != null
                           ? () => onAddField!(TemplateSectionId.bottomRight)
                           : null,
-                      child: template.bottomRight.isEmpty
+                      child: (template.bottomRight.isEmpty && onSectionTap == null)
                           ? _customFieldsBox(accent)
                           : _renderSection(template.bottomRight, profile,
                               boldColor: const Color(0xFF202124),
@@ -944,7 +944,7 @@ class _ModernDoc extends StatelessWidget {
                   onAddField: onAddField != null
                       ? () => onAddField!(TemplateSectionId.topLeft)
                       : null,
-                  child: template.topLeft.isEmpty
+                  child: (template.topLeft.isEmpty && onSectionTap == null)
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -984,7 +984,7 @@ class _ModernDoc extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (template.topRight.isEmpty) ...[
+                    if (template.topRight.isEmpty && onSectionTap == null) ...[
                       Text(template.titleLabel,
                           style: TextStyle(
                               color: textOnHeader,
@@ -1006,7 +1006,7 @@ class _ModernDoc extends StatelessWidget {
                           style: TextStyle(
                               color: textOnHeader.withOpacity(0.7),
                               fontSize: 9)),
-                    ] else
+                    ] else if (!template.topRight.isEmpty)
                       _renderSection(template.topRight, profile,
                           boldColor: textOnHeader,
                           baseColor: textOnHeader.withOpacity(0.7),
@@ -1058,7 +1058,7 @@ class _ModernDoc extends StatelessWidget {
                         onAddField: onAddField != null
                             ? () => onAddField!(TemplateSectionId.bottomLeft)
                             : null,
-                        child: template.bottomLeft.isEmpty
+                        child: (template.bottomLeft.isEmpty && onSectionTap == null)
                             ? _partyBox(
                                 title: 'CLIENT',
                                 name: 'Jean Dupont',
@@ -1083,7 +1083,7 @@ class _ModernDoc extends StatelessWidget {
                           onAddField: onAddField != null
                               ? () => onAddField!(TemplateSectionId.bottomRight)
                               : null,
-                          child: template.bottomRight.isEmpty
+                          child: (template.bottomRight.isEmpty && onSectionTap == null)
                               ? _customFieldsBox(accent)
                               : _renderSection(template.bottomRight, profile,
                                   boldColor: const Color(0xFF202124),
@@ -1184,7 +1184,7 @@ class _MinimalDoc extends StatelessWidget {
                   onAddField: onAddField != null
                       ? () => onAddField!(TemplateSectionId.topLeft)
                       : null,
-                  child: template.topLeft.isEmpty
+                  child: (template.topLeft.isEmpty && onSectionTap == null)
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1211,7 +1211,7 @@ class _MinimalDoc extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    template.topRight.isEmpty
+                    (template.topRight.isEmpty && onSectionTap == null)
                         ? Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
@@ -1261,7 +1261,7 @@ class _MinimalDoc extends StatelessWidget {
                     onAddField: onAddField != null
                         ? () => onAddField!(TemplateSectionId.bottomLeft)
                         : null,
-                    child: template.bottomLeft.isEmpty
+                    child: (template.bottomLeft.isEmpty && onSectionTap == null)
                         ? Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1290,7 +1290,7 @@ class _MinimalDoc extends StatelessWidget {
                       onAddField: onAddField != null
                           ? () => onAddField!(TemplateSectionId.bottomRight)
                           : null,
-                      child: template.bottomRight.isEmpty
+                      child: (template.bottomRight.isEmpty && onSectionTap == null)
                           ? _customFieldsBox(accent)
                           : _renderSection(template.bottomRight, profile,
                               boldColor: const Color(0xFF202124),
@@ -1414,7 +1414,7 @@ class _BoldDoc extends StatelessWidget {
                   onAddField: onAddField != null
                       ? () => onAddField!(TemplateSectionId.topCenter)
                       : null,
-                  child: template.topCenter.isEmpty
+                  child: (template.topCenter.isEmpty && onSectionTap == null)
                       ? Text(
                           template.titleLabel.toUpperCase(),
                           textAlign: TextAlign.center,
@@ -1443,7 +1443,7 @@ class _BoldDoc extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (template.topRight.isEmpty) ...[
+                    if (template.topRight.isEmpty && onSectionTap == null) ...[
                       Text('Facture Janv. 2026',
                           style: TextStyle(
                               color: textOnHeader,
@@ -1463,7 +1463,7 @@ class _BoldDoc extends StatelessWidget {
                           style: TextStyle(
                               color: textOnHeader.withOpacity(0.7),
                               fontSize: 8)),
-                    ] else
+                    ] else if (!template.topRight.isEmpty)
                       _renderSection(template.topRight, profile,
                           boldColor: textOnHeader,
                           baseColor: textOnHeader.withOpacity(0.7),
@@ -1501,7 +1501,7 @@ class _BoldDoc extends StatelessWidget {
                         onAddField: onAddField != null
                             ? () => onAddField!(TemplateSectionId.bottomLeft)
                             : null,
-                        child: template.bottomLeft.isEmpty
+                        child: (template.bottomLeft.isEmpty && onSectionTap == null)
                             ? _partyBox(
                                 title: 'CLIENT',
                                 name: 'Jean Dupont',
@@ -1526,7 +1526,7 @@ class _BoldDoc extends StatelessWidget {
                           onAddField: onAddField != null
                               ? () => onAddField!(TemplateSectionId.bottomRight)
                               : null,
-                          child: template.bottomRight.isEmpty
+                          child: (template.bottomRight.isEmpty && onSectionTap == null)
                               ? _customFieldsBox(accent)
                               : _renderSection(template.bottomRight, profile,
                                   boldColor: const Color(0xFF202124),
@@ -1941,13 +1941,13 @@ Widget _footerSection(
     children: [
       Divider(color: Colors.grey.shade200, thickness: 0.5),
       const SizedBox(height: 4),
-      if (section.isEmpty) ...[
+      if (section.isEmpty && onFieldTap == null) ...[
         Text('Merci pour votre confiance.',
             style: TextStyle(
                 fontSize: 8,
                 color: onDark ? Colors.white70 : Colors.grey.shade400),
             textAlign: TextAlign.center),
-      ] else
+      ] else if (!section.isEmpty)
         ...section.fields.asMap().entries.map<Widget>((entry) {
           final i = entry.key;
           final f = entry.value;

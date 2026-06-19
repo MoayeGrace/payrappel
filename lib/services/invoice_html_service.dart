@@ -8,8 +8,7 @@ import '../data/models/invoice_model.dart';
 import '../data/models/invoice_template_model.dart';
 import '../data/models/payment_model.dart';
 
-/// Source unique de rendu HTML — utilisée par [WordService] et [TemplatePdfService].
-/// Un seul fichier à modifier pour mettre à jour PDF et Word simultanément.
+/// Source unique de rendu HTML — utilisée par [TemplatePdfService].
 class InvoiceHtmlService {
   // ---------------------------------------------------------------------------
   // Public API

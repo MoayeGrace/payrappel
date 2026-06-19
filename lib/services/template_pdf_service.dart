@@ -198,16 +198,16 @@ class TemplatePdfService {
                     ),
                   ),
                   pw.SizedBox(height: 4),
-                  pw.Text(
-                    _invoiceNum(c),
-                    style: pw.TextStyle(
-                      fontSize: 8,
-                      fontWeight: pw.FontWeight.bold,
-                      color: c.accent,
-                    ),
-                  ),
-                  pw.SizedBox(height: 3),
                   if (c.template.topRight.isEmpty) ...[
+                    pw.Text(
+                      _invoiceNum(c),
+                      style: pw.TextStyle(
+                        fontSize: 8,
+                        fontWeight: pw.FontWeight.bold,
+                        color: c.accent,
+                      ),
+                    ),
+                    pw.SizedBox(height: 3),
                     _miniRow('Émise le', _fmtDate(c.invoice.createdAt)),
                     _miniRow('Échéance', _fmtDate(c.invoice.dueDate)),
                   ] else
@@ -234,10 +234,13 @@ class TemplatePdfService {
                   : _renderSectionContent(c.template.bottomLeft, c,
                       defaultColor: _kTextDark),
             ),
-            if (!c.template.bottomRight.isEmpty) ...[
+            if (!c.template.bottomRight.isEmpty || c.invoice.customFields.isNotEmpty) ...[
               pw.SizedBox(width: 8),
               pw.Expanded(
-                  child: _renderSectionContent(c.template.bottomRight, c)),
+                child: c.template.bottomRight.isEmpty
+                    ? _customFieldsBoxPdf(c)
+                    : _renderSectionContent(c.template.bottomRight, c),
+              ),
             ],
           ],
         ),
@@ -425,10 +428,13 @@ class TemplatePdfService {
                   : _renderSectionContent(c.template.bottomLeft, c,
                       defaultColor: _kTextDark),
             ),
-            if (!c.template.bottomRight.isEmpty) ...[
+            if (!c.template.bottomRight.isEmpty || c.invoice.customFields.isNotEmpty) ...[
               pw.SizedBox(width: 8),
               pw.Expanded(
-                  child: _renderSectionContent(c.template.bottomRight, c)),
+                child: c.template.bottomRight.isEmpty
+                    ? _customFieldsBoxPdf(c)
+                    : _renderSectionContent(c.template.bottomRight, c),
+              ),
             ],
           ],
         )),
@@ -591,10 +597,13 @@ class TemplatePdfService {
                   : _renderSectionContent(c.template.bottomLeft, c,
                       defaultColor: _kTextDark),
             ),
-            if (!c.template.bottomRight.isEmpty) ...[
+            if (!c.template.bottomRight.isEmpty || c.invoice.customFields.isNotEmpty) ...[
               pw.SizedBox(width: 16),
               pw.Expanded(
-                  child: _renderSectionContent(c.template.bottomRight, c)),
+                child: c.template.bottomRight.isEmpty
+                    ? _customFieldsBoxPdf(c)
+                    : _renderSectionContent(c.template.bottomRight, c),
+              ),
             ],
           ],
         ),
@@ -776,10 +785,13 @@ class TemplatePdfService {
                   : _renderSectionContent(c.template.bottomLeft, c,
                       defaultColor: _kTextDark),
             ),
-            if (!c.template.bottomRight.isEmpty) ...[
+            if (!c.template.bottomRight.isEmpty || c.invoice.customFields.isNotEmpty) ...[
               pw.SizedBox(width: 8),
               pw.Expanded(
-                  child: _renderSectionContent(c.template.bottomRight, c)),
+                child: c.template.bottomRight.isEmpty
+                    ? _customFieldsBoxPdf(c)
+                    : _renderSectionContent(c.template.bottomRight, c),
+              ),
             ],
           ],
         )),
@@ -903,9 +915,14 @@ class TemplatePdfService {
     return pw.Column(
       crossAxisAlignment: align,
       children: section.fields.map((f) {
+        // Le statut est affiché via le badge coloré — jamais via le texte brut
+        if (f.source == FieldSource.invoiceStatus) return pw.SizedBox();
         final text = _resolveField(f, c);
         if (text.isEmpty) return pw.SizedBox();
         final label = f.label;
+        final fgColor = f.textColor != null
+            ? _c(f.textColor!)
+            : (f.source == FieldSource.invoiceNumber ? c.accent : defaultColor);
         return pw.Padding(
           padding: const pw.EdgeInsets.only(bottom: 2),
           child: label != null
@@ -919,9 +936,7 @@ class TemplatePdfService {
                           fontWeight: f.bold
                               ? pw.FontWeight.bold
                               : pw.FontWeight.normal,
-                          color: f.textColor != null
-                              ? _c(f.textColor!)
-                              : defaultColor,
+                          color: fgColor,
                         )),
                   ],
                 )
@@ -931,9 +946,7 @@ class TemplatePdfService {
                     fontSize: f.large ? 12 : 9,
                     fontWeight:
                         f.bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-                    color: f.textColor != null
-                        ? _c(f.textColor!)
-                        : defaultColor,
+                    color: fgColor,
                   ),
                 ),
         );
@@ -981,23 +994,76 @@ class TemplatePdfService {
     );
   }
 
-static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
+  static pw.Widget _customFieldsBoxPdf(_RenderCtx c) {
+    final fields = c.invoice.customFields;
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.end,
+      children: [
+        pw.Text(
+          'CHAMPS LIBRES',
+          textAlign: pw.TextAlign.right,
+          style: pw.TextStyle(
+            fontSize: 7,
+            fontWeight: pw.FontWeight.bold,
+            color: _kLabelGrey,
+            letterSpacing: 0.8,
+          ),
+        ),
+        pw.SizedBox(height: 4),
+        ...fields.map((f) => pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 3),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Text(
+                    '${f['label'] ?? ''} :',
+                    style: const pw.TextStyle(fontSize: 8, color: _kTextGrey),
+                  ),
+                  pw.SizedBox(width: 4),
+                  pw.Text(
+                    f['value'] ?? '',
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _kTextDark,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+      ],
+    );
+  }
+
+  static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
     final items = c.invoice.lineItems;
+    final extraCols = c.invoice.extraColumns;
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(4),
+      1: const pw.FlexColumnWidth(1),
+      2: const pw.FlexColumnWidth(2),
+    };
+    for (var i = 0; i < extraCols.length; i++) {
+      colWidths[3 + i] = const pw.FlexColumnWidth(2);
+    }
+    colWidths[3 + extraCols.length] = const pw.FlexColumnWidth(2);
+
+    final headers = [
+      'Désignation', 'Qté', 'PU (${CurrencyFormatter.symbol})',
+      ...extraCols.map((c) => c['name'] as String),
+      'Total (${CurrencyFormatter.symbol})',
+    ];
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Table(
           border: pw.TableBorder.all(color: _kDivider, width: 0.5),
-          columnWidths: const {
-            0: pw.FlexColumnWidth(4),
-            1: pw.FlexColumnWidth(1),
-            2: pw.FlexColumnWidth(2),
-            3: pw.FlexColumnWidth(2),
-          },
+          columnWidths: colWidths,
           children: [
             pw.TableRow(
               decoration: pw.BoxDecoration(color: c.accent),
-              children: ['Désignation', 'Qté', 'PU (${CurrencyFormatter.symbol})', 'Total (${CurrencyFormatter.symbol})']
+              children: headers
                   .map((h) => _tCell(h, header: true, textColor: PdfColors.white))
                   .toList(),
             ),
@@ -1009,6 +1075,7 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
                 _tCell(item['description'] as String? ?? ''),
                 _tCell('$qty'),
                 _tCell(CurrencyFormatter.format(pu)),
+                ...extraCols.map((col) => _tCell(item[col['key'] as String] as String? ?? '')),
                 _tCell(CurrencyFormatter.format(total)),
               ]);
             }),
@@ -1303,8 +1370,18 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
   static pw.Widget _footer(_RenderCtx c) {
     final section = c.template.bottomCenter;
     final profile = c.profile;
+    final crossAxis = section.alignment == 'right'
+        ? pw.CrossAxisAlignment.end
+        : section.alignment == 'center'
+            ? pw.CrossAxisAlignment.center
+            : pw.CrossAxisAlignment.start;
+    final textAlign = section.alignment == 'right'
+        ? pw.TextAlign.right
+        : section.alignment == 'center'
+            ? pw.TextAlign.center
+            : pw.TextAlign.left;
     return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      crossAxisAlignment: crossAxis,
       children: [
         pw.Divider(color: _kDivider, thickness: 0.5),
         pw.SizedBox(height: 4),
@@ -1321,7 +1398,7 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
                   fontWeight: f.bold ? pw.FontWeight.bold : pw.FontWeight.normal,
                   color: f.textColor != null ? _c(f.textColor!) : _kTextGrey,
                 ),
-                textAlign: pw.TextAlign.center,
+                textAlign: textAlign,
               ),
             );
           })
@@ -1331,7 +1408,7 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
                 ? profile.footerText
                 : 'Merci pour votre confiance.',
             style: const pw.TextStyle(fontSize: 9, color: _kTextGrey),
-            textAlign: pw.TextAlign.center,
+            textAlign: textAlign,
           ),
         pw.Text(
           'Document généré par PayRappel',

@@ -18,7 +18,6 @@ import '../../providers/invoice_template_provider.dart';
 import '../../data/models/invoice_template_model.dart';
 import '../../services/pdf_service.dart';
 import '../../services/template_pdf_service.dart';
-import '../../services/word_service.dart';
 import '../templates/template_preview_screen.dart';
 import 'invoices_screen.dart' show statusLabel;
 
@@ -61,7 +60,6 @@ class _InvoiceDetailView extends StatefulWidget {
 
 class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
   bool _exportingPdf = false;
-  bool _exportingWord = false;
 
   InvoiceModel get invoice => widget.invoice;
 
@@ -130,45 +128,6 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
       }
     } finally {
       if (mounted) setState(() => _exportingPdf = false);
-    }
-  }
-
-  Future<void> _exportWord() async {
-    final picked = await _pickTemplate(
-      confirmLabel: 'Générer le document Word',
-      confirmIcon: Icons.article_outlined,
-    );
-    if (!mounted || picked == null) return;
-    await context.read<InvoiceProvider>().updateInvoice(
-          invoice.copyWith(templateId: picked.id),
-        );
-    if (!mounted) return;
-    final template = picked;
-
-    setState(() => _exportingWord = true);
-    final messenger = ScaffoldMessenger.of(context);
-    final clientProv = context.read<ClientProvider>();
-    final paymentProv = context.read<PaymentProvider>();
-    final profile = context.read<BusinessProfileProvider>().profile;
-    try {
-      final client = await clientProv.getClient(invoice.clientId);
-      final payments =
-          await paymentProv.watchPaymentsByInvoice(invoice.id).first;
-      await WordService.shareWord(
-        invoice: invoice,
-        payments: payments,
-        profile: profile,
-        template: template,
-        clientPhone: client?.phone,
-        clientEmail: client?.email,
-        clientAddress: client?.address,
-      );
-    } catch (e) {
-      if (mounted) {
-        messenger.showSnackBar(SnackBar(content: Text('Erreur Word : $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _exportingWord = false);
     }
   }
 
@@ -596,17 +555,6 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
                               onTap: _exportPdf,
                             ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _exportingWord
-                          ? const _ExportingIndicator(color: Color(0xFF2B579A))
-                          : _ActionButton(
-                              icon: Icons.article_outlined,
-                              label: 'Word',
-                              color: const Color(0xFF2B579A),
-                              onTap: _exportWord,
-                            ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -800,23 +748,22 @@ class _LineItemsTable extends StatelessWidget {
             color: const Color(0xFF1A73E8).withOpacity(0.08),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Expanded(
-                  flex: 4,
-                  child: Text('Désignation', style: labelStyle)),
-              Expanded(
-                  flex: 1,
-                  child: Text('Qté',
-                      style: labelStyle, textAlign: TextAlign.center)),
-              Expanded(
+              const Expanded(flex: 4, child: Text('Désignation', style: labelStyle)),
+              const Expanded(flex: 1, child: Text('Qté', style: labelStyle, textAlign: TextAlign.center)),
+              const Expanded(flex: 2, child: Text('PU', style: labelStyle, textAlign: TextAlign.end)),
+              for (final col in invoice.extraColumns)
+                Expanded(
                   flex: 2,
-                  child: Text('PU',
-                      style: labelStyle, textAlign: TextAlign.end)),
-              Expanded(
-                  flex: 2,
-                  child: Text('Total',
-                      style: labelStyle, textAlign: TextAlign.end)),
+                  child: Text(
+                    col['name'] as String,
+                    style: labelStyle,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              const Expanded(flex: 2, child: Text('Total', style: labelStyle, textAlign: TextAlign.end)),
             ],
           ),
         ),
@@ -826,31 +773,25 @@ class _LineItemsTable extends StatelessWidget {
           final pu = (item['unitPrice'] as num? ?? 0).toDouble();
           final total = qty * pu;
           return Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
             child: Row(
               children: [
-                Expanded(
-                    flex: 4,
-                    child: Text(desc,
-                        style: const TextStyle(fontSize: 13))),
-                Expanded(
-                    flex: 1,
-                    child: Text('$qty',
-                        style: const TextStyle(fontSize: 13),
-                        textAlign: TextAlign.center)),
-                Expanded(
+                Expanded(flex: 4, child: Text(desc, style: const TextStyle(fontSize: 13))),
+                Expanded(flex: 1, child: Text('$qty', style: const TextStyle(fontSize: 13), textAlign: TextAlign.center)),
+                Expanded(flex: 2, child: Text(CurrencyFormatter.format(pu), style: const TextStyle(fontSize: 13), textAlign: TextAlign.end)),
+                for (final col in invoice.extraColumns)
+                  Expanded(
                     flex: 2,
-                    child: Text(CurrencyFormatter.format(pu),
-                        style: const TextStyle(fontSize: 13),
-                        textAlign: TextAlign.end)),
+                    child: Text(
+                      item[col['key'] as String] as String? ?? '',
+                      style: const TextStyle(fontSize: 13),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 Expanded(
                     flex: 2,
                     child: Text(CurrencyFormatter.format(total),
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A73E8)),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1A73E8)),
                         textAlign: TextAlign.end)),
               ],
             ),

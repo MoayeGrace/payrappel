@@ -13,36 +13,57 @@ class _LineItemCtrl {
   final TextEditingController description;
   final TextEditingController qty;
   final TextEditingController unitPrice;
+  final Map<String, TextEditingController> extras;
 
-  _LineItemCtrl({String desc = '', int q = 1, double pu = 0})
-      : description = TextEditingController(text: desc),
+  _LineItemCtrl({
+    String desc = '',
+    int q = 1,
+    double pu = 0,
+    Map<String, String> extraVals = const {},
+  })  : description = TextEditingController(text: desc),
         qty = TextEditingController(text: q.toString()),
-        unitPrice = TextEditingController(
-            text: pu == 0 ? '' : pu.toStringAsFixed(0));
+        unitPrice = TextEditingController(text: pu == 0 ? '' : pu.toStringAsFixed(0)),
+        extras = Map.fromEntries(
+          extraVals.entries.map(
+            (e) => MapEntry(e.key, TextEditingController(text: e.value)),
+          ),
+        );
+
+  void addExtra(String key, {String value = ''}) {
+    if (!extras.containsKey(key)) {
+      extras[key] = TextEditingController(text: value);
+    }
+  }
+
+  void removeExtra(String key) {
+    extras[key]?.dispose();
+    extras.remove(key);
+  }
 
   void attachListener(VoidCallback fn) {
     description.addListener(fn);
     qty.addListener(fn);
     unitPrice.addListener(fn);
+    for (final c in extras.values) c.addListener(fn);
   }
 
   void dispose() {
     description.dispose();
     qty.dispose();
     unitPrice.dispose();
+    for (final c in extras.values) c.dispose();
   }
 
   Map<String, dynamic> toMap() => {
         'description': description.text.trim(),
         'qty': int.tryParse(qty.text.trim()) ?? 1,
-        'unitPrice':
-            double.tryParse(unitPrice.text.trim().replaceAll(' ', '')) ?? 0.0,
+        'unitPrice': double.tryParse(unitPrice.text.trim().replaceAll(' ', '')) ?? 0.0,
+        ...extras.map((k, c) => MapEntry(k, c.text.trim())),
       };
 
   double get lineTotal {
     final q = int.tryParse(qty.text.trim()) ?? 0;
-    final pu =
-        double.tryParse(unitPrice.text.trim().replaceAll(' ', '')) ?? 0.0;
+    final pu = double.tryParse(unitPrice.text.trim().replaceAll(' ', '')) ?? 0.0;
     return q * pu;
   }
 }
@@ -139,6 +160,8 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
   late final TextEditingController _globalPriceCtrl;
 
   final List<_LineItemCtrl> _lineCtrl = [];
+  List<Map<String, dynamic>> _extraColumns = [];
+  final List<TextEditingController> _colNameCtrls = [];
   String? _selectedClientId;
   String? _selectedClientName;
   DateTime _dueDate = DateTime.now().add(const Duration(days: 30));
@@ -169,6 +192,12 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
     if (widget.invoice != null) {
       _dueDate = widget.invoice!.dueDate;
       _customFields = List.from(widget.invoice!.customFields);
+      _extraColumns = List.from(widget.invoice!.extraColumns);
+      for (final col in _extraColumns) {
+        final ctrl = TextEditingController(text: col['name'] as String? ?? '');
+        ctrl.addListener(_onChanged);
+        _colNameCtrls.add(ctrl);
+      }
       final gp = widget.invoice!.globalPrice;
       if (gp != null && gp > 0) {
         _globalPriceCtrl =
@@ -179,10 +208,16 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
         final items = widget.invoice!.lineItems;
         if (items.isNotEmpty) {
           for (final item in items) {
+            final extraVals = <String, String>{};
+            for (final col in _extraColumns) {
+              final key = col['key'] as String;
+              extraVals[key] = item[key] as String? ?? '';
+            }
             _lineCtrl.add(_newCtrl(
               desc: item['description'] as String? ?? '',
               q: (item['qty'] as num? ?? 1).toInt(),
               pu: (item['unitPrice'] as num? ?? 0).toDouble(),
+              extraVals: extraVals,
             ));
           }
         } else {
@@ -211,8 +246,17 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
     if (mounted) setState(() {});
   }
 
-  _LineItemCtrl _newCtrl({String desc = '', int q = 1, double pu = 0}) {
-    final ctrl = _LineItemCtrl(desc: desc, q: q, pu: pu);
+  _LineItemCtrl _newCtrl({
+    String desc = '',
+    int q = 1,
+    double pu = 0,
+    Map<String, String> extraVals = const {},
+  }) {
+    final ctrl = _LineItemCtrl(desc: desc, q: q, pu: pu, extraVals: extraVals);
+    for (final col in _extraColumns) {
+      final key = col['key'] as String;
+      ctrl.addExtra(key);
+    }
     ctrl.attachListener(_onChanged);
     return ctrl;
   }
@@ -231,7 +275,37 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
     for (final ctrl in _lineCtrl) {
       ctrl.dispose();
     }
+    for (final ctrl in _colNameCtrls) {
+      ctrl.dispose();
+    }
     super.dispose();
+  }
+
+  // ── Gestion des colonnes du tableau ───────────────────────────────────────
+  void _addColumn() {
+    final key = 'col_${DateTime.now().millisecondsSinceEpoch}';
+    final name = 'Col. ${_extraColumns.length + 1}';
+    final nameCtrl = TextEditingController(text: name);
+    nameCtrl.addListener(_onChanged);
+    setState(() {
+      _extraColumns.add({'name': name, 'key': key});
+      _colNameCtrls.add(nameCtrl);
+      for (final lc in _lineCtrl) {
+        lc.addExtra(key);
+      }
+    });
+  }
+
+  void _removeColumn(int i) {
+    final key = _extraColumns[i]['key'] as String;
+    _colNameCtrls[i].dispose();
+    setState(() {
+      _extraColumns.removeAt(i);
+      _colNameCtrls.removeAt(i);
+      for (final lc in _lineCtrl) {
+        lc.removeExtra(key);
+      }
+    });
   }
 
   // ── Champs personnalisés ───────────────────────────────────────────────────
@@ -359,6 +433,7 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
       final lineItems = _globalPrice > 0
           ? const <Map<String, dynamic>>[]
           : _lineCtrl.map((c) => c.toMap()).toList();
+      final extraColumns = _globalPrice > 0 ? const <Map<String, dynamic>>[] : _extraColumns;
       final discount = _discountAmt;
       final amount = _totalAmt;
 
@@ -371,6 +446,7 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
             updatedAt: DateTime.now(),
             customFields: _customFields,
             lineItems: lineItems,
+            extraColumns: extraColumns,
             discountAmount: discount,
             globalPrice: _globalPrice > 0 ? _globalPrice : null,
             clearGlobalPrice: _globalPrice <= 0,
@@ -386,6 +462,7 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
           dueDate: _dueDate,
           customFields: _customFields,
           lineItems: lineItems,
+          extraColumns: extraColumns,
           discountAmount: discount,
           globalPrice: _globalPrice > 0 ? _globalPrice : null,
         );
@@ -411,32 +488,60 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
         fontWeight: FontWeight.w600,
         color: Color(0xFF1E88E5));
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         color: const Color(0xFF1E88E5).withOpacity(0.08),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Expanded(
+          const Expanded(
               flex: 4,
               child: Padding(
                 padding: EdgeInsets.only(left: 4),
                 child: Text('Désignation', style: labelStyle),
               )),
-          Expanded(
+          const Expanded(
               flex: 1,
               child: Text('Qté',
                   style: labelStyle, textAlign: TextAlign.center)),
-          Expanded(
+          const Expanded(
               flex: 2,
               child: Text('PU (FCFA)',
                   style: labelStyle, textAlign: TextAlign.center)),
-          Expanded(
+          for (int i = 0; i < _extraColumns.length; i++)
+            Expanded(
+              flex: 2,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _colNameCtrls[i],
+                      onChanged: (v) => _extraColumns[i]['name'] = v,
+                      style: labelStyle,
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 6),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => _removeColumn(i),
+                    child: Icon(Icons.close, size: 12, color: Colors.red[400]),
+                  ),
+                  const SizedBox(width: 2),
+                ],
+              ),
+            ),
+          const Expanded(
               flex: 2,
               child: Text('Total',
                   style: labelStyle, textAlign: TextAlign.end)),
-          SizedBox(width: 28),
+          const SizedBox(width: 28),
         ],
       ),
     );
@@ -502,6 +607,21 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
               ),
             ),
           ),
+          for (final col in _extraColumns) ...[
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 2,
+              child: SizedBox(
+                height: 36,
+                child: TextField(
+                  controller: ctrl.extras[col['key'] as String],
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12),
+                  decoration: dec.copyWith(hintText: '—'),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(width: 4),
           Expanded(
             flex: 2,
@@ -691,15 +811,34 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.table_rows_outlined,
+                        const Icon(Icons.table_rows_outlined,
                             size: 18, color: Color(0xFF1E88E5)),
-                        SizedBox(width: 8),
-                        Text(
+                        const SizedBox(width: 8),
+                        const Text(
                           'Lignes de facturation',
                           style: TextStyle(
                               fontSize: 15, fontWeight: FontWeight.w600),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: _addColumn,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add_circle_outline,
+                                    size: 16, color: Colors.grey[600]),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Colonne',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -968,3 +1107,4 @@ class _AddEditInvoiceScreenState extends State<AddEditInvoiceScreen> {
     );
   }
 }
+

@@ -420,7 +420,7 @@ const _sectionClient = TemplateSectionModel(
 );
 
 const _sectionFooter = TemplateSectionModel(
-  alignment: 'center',
+  alignment: 'right',
   fields: [
     TemplateFieldConfig(
         source: FieldSource.manual,

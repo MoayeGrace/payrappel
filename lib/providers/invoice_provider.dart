@@ -20,6 +20,7 @@ class InvoiceProvider extends ChangeNotifier {
     required DateTime dueDate,
     List<Map<String, String>> customFields = const [],
     List<Map<String, dynamic>> lineItems = const [],
+    List<Map<String, dynamic>> extraColumns = const [],
     double discountAmount = 0,
     double? globalPrice,
   }) =>
@@ -31,6 +32,7 @@ class InvoiceProvider extends ChangeNotifier {
         dueDate: dueDate,
         customFields: customFields,
         lineItems: lineItems,
+        extraColumns: extraColumns,
         discountAmount: discountAmount,
         globalPrice: globalPrice,
       );

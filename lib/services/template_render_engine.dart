@@ -220,7 +220,14 @@ class TemplateRenderEngine {
         // Footer
         if (!template.bottomCenter.isEmpty) ...[
           const SizedBox(height: gapSection),
-          _renderSectionFlutter(template.bottomCenter, accent),
+          Align(
+            alignment: template.bottomCenter.alignment == 'right'
+                ? Alignment.centerRight
+                : template.bottomCenter.alignment == 'center'
+                    ? Alignment.center
+                    : Alignment.centerLeft,
+            child: _renderSectionFlutter(template.bottomCenter, accent),
+          ),
         ],
       ],
     );
@@ -313,24 +320,38 @@ class TemplateRenderEngine {
                 _renderSectionFlutter(template.topCenter, accent),
                 const SizedBox(height: gapSection),
               ],
-              Row(
-                children: [
-                  Expanded(
-                    child: template.bottomLeft.isEmpty
-                        ? _partyBoxFlutter(
-                            title: 'CLIENT',
-                            name: invoice.clientName,
-                            lines: [
-                              clientAddress,
-                              clientPhone,
-                              clientEmail
-                            ],
-                            bg: colorBoxBg,
-                            accent: accent,
-                          )
-                        : _renderSectionFlutter(template.bottomLeft, accent),
-                  ),
-                ],
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: template.bottomLeft.isEmpty
+                          ? _partyBoxFlutter(
+                              title: 'CLIENT',
+                              name: invoice.clientName,
+                              lines: [
+                                clientAddress,
+                                clientPhone,
+                                clientEmail
+                              ],
+                              bg: colorBoxBg,
+                              accent: accent,
+                            )
+                          : _renderSectionFlutter(template.bottomLeft, accent),
+                    ),
+                    if (!template.bottomRight.isEmpty ||
+                        invoice.customFields.isNotEmpty ||
+                        invoice.notes.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: template.bottomRight.isEmpty
+                            ? _customFieldsBoxFlutter(accent)
+                            : _renderSectionFlutter(
+                                template.bottomRight, accent),
+                      ),
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: gapSection),
               if (invoice.lineItems.isNotEmpty) ...[
@@ -344,7 +365,14 @@ class TemplateRenderEngine {
               ],
               if (!template.bottomCenter.isEmpty) ...[
                 const SizedBox(height: gapSection),
-                _renderSectionFlutter(template.bottomCenter, accent),
+                Align(
+                  alignment: template.bottomCenter.alignment == 'right'
+                      ? Alignment.centerRight
+                      : template.bottomCenter.alignment == 'center'
+                          ? Alignment.center
+                          : Alignment.centerLeft,
+                  child: _renderSectionFlutter(template.bottomCenter, accent),
+                ),
               ],
             ],
           ),
@@ -415,44 +443,57 @@ class TemplateRenderEngine {
         const SizedBox(height: 10),
         Divider(color: accent, thickness: 1.5),
         const SizedBox(height: paddingSection),
-        Row(
-          children: [
-            Expanded(
-              child: template.bottomLeft.isEmpty
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'CLIENT',
-                          style: TextStyle(
-                            fontSize: 7,
-                            fontWeight: FontWeight.bold,
-                            color: colorLabelGrey,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          invoice.clientName,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: colorTextDark,
-                          ),
-                        ),
-                        if (clientPhone.isNotEmpty)
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: template.bottomLeft.isEmpty
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            clientPhone,
-                            style: const TextStyle(
-                              fontSize: 9,
-                              color: colorTextGrey,
+                            'CLIENT',
+                            style: TextStyle(
+                              fontSize: 7,
+                              fontWeight: FontWeight.bold,
+                              color: colorLabelGrey,
+                              letterSpacing: 0.8,
                             ),
                           ),
-                      ],
-                    )
-                  : _renderSectionFlutter(template.bottomLeft, accent),
-            ),
-          ],
+                          const SizedBox(height: 4),
+                          Text(
+                            invoice.clientName,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: colorTextDark,
+                            ),
+                          ),
+                          if (clientPhone.isNotEmpty)
+                            Text(
+                              clientPhone,
+                              style: const TextStyle(
+                                fontSize: 9,
+                                color: colorTextGrey,
+                              ),
+                            ),
+                        ],
+                      )
+                    : _renderSectionFlutter(template.bottomLeft, accent),
+              ),
+              if (!template.bottomRight.isEmpty ||
+                  invoice.customFields.isNotEmpty ||
+                  invoice.notes.isNotEmpty) ...[
+                const SizedBox(width: 16),
+                Expanded(
+                  child: template.bottomRight.isEmpty
+                      ? _customFieldsBoxFlutter(accent)
+                      : _renderSectionFlutter(template.bottomRight, accent),
+                ),
+              ],
+            ],
+          ),
         ),
         const SizedBox(height: paddingSection),
         if (invoice.lineItems.isNotEmpty) ...[
@@ -533,24 +574,38 @@ class TemplateRenderEngine {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: template.bottomLeft.isEmpty
-                        ? _partyBoxFlutter(
-                            title: 'CLIENT',
-                            name: invoice.clientName,
-                            lines: [
-                              clientAddress,
-                              clientPhone,
-                              clientEmail
-                            ],
-                            bg: colorBoxBg,
-                            accent: accent,
-                          )
-                        : _renderSectionFlutter(template.bottomLeft, accent),
-                  ),
-                ],
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: template.bottomLeft.isEmpty
+                          ? _partyBoxFlutter(
+                              title: 'CLIENT',
+                              name: invoice.clientName,
+                              lines: [
+                                clientAddress,
+                                clientPhone,
+                                clientEmail
+                              ],
+                              bg: colorBoxBg,
+                              accent: accent,
+                            )
+                          : _renderSectionFlutter(template.bottomLeft, accent),
+                    ),
+                    if (!template.bottomRight.isEmpty ||
+                        invoice.customFields.isNotEmpty ||
+                        invoice.notes.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: template.bottomRight.isEmpty
+                            ? _customFieldsBoxFlutter(accent)
+                            : _renderSectionFlutter(
+                                template.bottomRight, accent),
+                      ),
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: gapSection),
               if (invoice.lineItems.isNotEmpty) ...[
@@ -572,8 +627,18 @@ class TemplateRenderEngine {
   // ── Flutter Helpers ────────────────────────────────────────────────────────
 
   Widget _renderSectionFlutter(TemplateSectionModel section, Color accent) {
+    final crossAxis = section.alignment == 'right'
+        ? CrossAxisAlignment.end
+        : section.alignment == 'center'
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start;
+    final textAlign = section.alignment == 'right'
+        ? TextAlign.right
+        : section.alignment == 'center'
+            ? TextAlign.center
+            : TextAlign.left;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: crossAxis,
       children: section.fields.map((f) {
         if (f.source == FieldSource.invoiceStatus) return const SizedBox.shrink();
         final text = resolveField(f);
@@ -585,6 +650,7 @@ class TemplateRenderEngine {
           padding: const EdgeInsets.only(bottom: 4),
           child: Text(
             text,
+            textAlign: textAlign,
             style: TextStyle(
               fontSize: f.large ? 14 : 9,
               fontWeight: f.bold ? FontWeight.bold : FontWeight.normal,
@@ -648,38 +714,57 @@ class TemplateRenderEngine {
   }
 
   Widget _customFieldsBoxFlutter(Color accent) {
-    return Container(
-      padding: const EdgeInsets.all(9),
-      decoration: BoxDecoration(
-        color: colorBoxBg,
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'NOTES',
-            style: TextStyle(
-              fontSize: 7,
-              fontWeight: FontWeight.bold,
-              color: colorLabelGrey,
-              letterSpacing: 0.8,
-            ),
+    final fields = invoice.customFields;
+    if (fields.isEmpty && invoice.notes.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          fields.isNotEmpty ? 'CHAMPS LIBRES' : 'NOTES',
+          textAlign: TextAlign.right,
+          style: const TextStyle(
+            fontSize: 7,
+            fontWeight: FontWeight.bold,
+            color: colorLabelGrey,
+            letterSpacing: 0.8,
           ),
-          const SizedBox(height: 4),
+        ),
+        const SizedBox(height: 4),
+        if (fields.isNotEmpty)
+          ...fields.map((f) => Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${f['label'] ?? ''} :',
+                      style: const TextStyle(fontSize: 8, color: colorTextGrey),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      f['value'] ?? '',
+                      style: const TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w600,
+                          color: colorTextDark),
+                    ),
+                  ],
+                ),
+              ))
+        else
           Text(
-            invoice.notes.isEmpty ? 'Aucune note' : invoice.notes,
-            style: const TextStyle(
-              fontSize: 9,
-              color: colorTextGrey,
-            ),
+            invoice.notes,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontSize: 9, color: colorTextGrey),
           ),
-        ],
-      ),
+      ],
     );
   }
 
   Widget _lineItemsTableFlutter(Color accent) {
+    final extraCols = invoice.extraColumns;
+    final colStyle = TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: accent);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -691,41 +776,15 @@ class TemplateRenderEngine {
           ),
           child: Row(
             children: [
-              Expanded(
-                flex: 4,
-                child: Text(
-                  'Désignation',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: accent,
-                  ),
+              Expanded(flex: 4, child: Text('Désignation', style: colStyle)),
+              Expanded(flex: 1, child: Text('Qté', style: colStyle, textAlign: TextAlign.center)),
+              Expanded(flex: 2, child: Text('PU', style: colStyle, textAlign: TextAlign.end)),
+              for (final col in extraCols)
+                Expanded(
+                  flex: 2,
+                  child: Text(col['name'] as String, style: colStyle, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
                 ),
-              ),
-              Expanded(
-                flex: 1,
-                child: Text(
-                  'Qté',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: accent),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'PU',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: accent),
-                  textAlign: TextAlign.end,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'Total',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: accent),
-                  textAlign: TextAlign.end,
-                ),
-              ),
+              Expanded(flex: 2, child: Text('Total', style: colStyle, textAlign: TextAlign.end)),
             ],
           ),
         ),
@@ -737,40 +796,17 @@ class TemplateRenderEngine {
             padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
             child: Row(
               children: [
-                Expanded(
-                  flex: 4,
-                  child: Text(
-                    item['description'] as String? ?? '',
-                    style: const TextStyle(fontSize: 9),
+                Expanded(flex: 4, child: Text(item['description'] as String? ?? '', style: const TextStyle(fontSize: 9))),
+                Expanded(flex: 1, child: Text('$qty', style: const TextStyle(fontSize: 9), textAlign: TextAlign.center)),
+                Expanded(flex: 2, child: Text(CurrencyFormatter.format(pu), style: const TextStyle(fontSize: 9), textAlign: TextAlign.end)),
+                for (final col in extraCols)
+                  Expanded(
+                    flex: 2,
+                    child: Text(item[col['key'] as String] as String? ?? '', style: const TextStyle(fontSize: 9), textAlign: TextAlign.center),
                   ),
-                ),
-                Expanded(
-                  flex: 1,
-                  child: Text(
-                    '$qty',
-                    style: const TextStyle(fontSize: 9),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
                 Expanded(
                   flex: 2,
-                  child: Text(
-                    CurrencyFormatter.format(pu),
-                    style: const TextStyle(fontSize: 9),
-                    textAlign: TextAlign.end,
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    CurrencyFormatter.format(total),
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: accent,
-                    ),
-                    textAlign: TextAlign.end,
-                  ),
+                  child: Text(CurrencyFormatter.format(total), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: accent), textAlign: TextAlign.end),
                 ),
               ],
             ),

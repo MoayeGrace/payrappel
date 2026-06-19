@@ -218,6 +218,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen>
                               child: SizedBox(
                                 width: 380,
                                 child: InvoiceDocPreview(
+                                  key: ObjectKey(_template),
                                   template: _template,
                                   accent: accent,
                                   headerBg: headerBg,
