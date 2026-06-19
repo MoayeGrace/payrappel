@@ -158,16 +158,16 @@ class TemplateRenderEngine {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    'N° ${invoice.id}',
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                      color: accent,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
                   if (template.topRight.isEmpty) ...[
+                    Text(
+                      'N° ${invoice.id}',
+                      style: TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                        color: accent,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
                     _metaRowFlutter('Émise le', _fmtDate(invoice.createdAt)),
                     _metaRowFlutter('Échéance', _fmtDate(invoice.dueDate)),
                   ] else
@@ -274,10 +274,10 @@ class TemplateRenderEngine {
                       )
                     : _renderSectionFlutter(template.topLeft, accent),
               ),
-              if (template.topRight.isEmpty)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (template.topRight.isEmpty) ...[
                     Text(
                       template.titleLabel,
                       style: TextStyle(
@@ -296,10 +296,11 @@ class TemplateRenderEngine {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ],
-                )
-              else
-                _renderSectionFlutter(template.topRight, accent),
+                  ] else
+                    _renderSectionFlutter(template.topRight, accent),
+                  ..._statusBadgeFlutter(accent),
+                ],
+              ),
             ],
           ),
         ),
@@ -406,6 +407,7 @@ class TemplateRenderEngine {
                     color: accent,
                   ),
                 ),
+                ..._statusBadgeFlutter(accent),
               ],
             ),
           ],
@@ -496,23 +498,27 @@ class TemplateRenderEngine {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    invoice.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                  if (template.topRight.isEmpty) ...[
+                    Text(
+                      invoice.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'N° ${invoice.id}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 4),
+                    Text(
+                      'N° ${invoice.id}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
+                  ] else
+                    _renderSectionFlutter(template.topRight, accent),
+                  ..._statusBadgeFlutter(accent),
                 ],
               ),
             ],
@@ -569,9 +575,12 @@ class TemplateRenderEngine {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: section.fields.map((f) {
+        if (f.source == FieldSource.invoiceStatus) return const SizedBox.shrink();
         final text = resolveField(f);
         if (text.isEmpty) return const SizedBox();
-        final color = f.textColor != null ? Color(f.textColor!) : colorTextDark;
+        final color = f.textColor != null
+            ? Color(f.textColor!)
+            : (f.source == FieldSource.invoiceNumber ? accent : colorTextDark);
         return Padding(
           padding: const EdgeInsets.only(bottom: 4),
           child: Text(
@@ -930,6 +939,7 @@ class TemplateRenderEngine {
           if (profile.bankName.isNotEmpty) profile.bankName,
           if (profile.bankAccount.isNotEmpty) profile.bankAccount,
         ].join(' — '),
+      FieldSource.today => _fmtDate(DateTime.now()),
       FieldSource.manual => f.manualValue ?? '',
     };
   }

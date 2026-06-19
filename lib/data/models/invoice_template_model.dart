@@ -29,6 +29,7 @@ enum FieldSource {
   invoiceStatus,
   bankInfo,
   invoiceNumber,
+  today,
   manual,
 }
 
@@ -49,6 +50,7 @@ extension FieldSourceLabel on FieldSource {
         FieldSource.invoiceStatus => 'Statut',
         FieldSource.bankInfo => 'Infos bancaires',
         FieldSource.invoiceNumber => 'Numéro de facture',
+        FieldSource.today => 'Date du jour',
         FieldSource.manual => 'Texte manuel',
       };
 }

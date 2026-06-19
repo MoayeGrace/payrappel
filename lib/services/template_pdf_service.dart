@@ -1381,6 +1381,8 @@ static pw.Widget _invoiceLineItemsBlock(_RenderCtx c) {
         return parts.join(' — ');
       case FieldSource.invoiceNumber:
         return _invoiceNum(c);
+      case FieldSource.today:
+        return _fmtDate(DateTime.now());
       case FieldSource.manual:
         return field.manualValue ?? '';
     }

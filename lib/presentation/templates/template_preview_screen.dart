@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -759,10 +760,10 @@ class _ClassicDoc extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text('N° FAC-2026-A3B4C5',
-                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: accent)),
-                      const SizedBox(height: 3),
                       if (template.topRight.isEmpty) ...[
+                        Text('N° FAC-2026-A3B4C5',
+                            style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: accent)),
+                        const SizedBox(height: 3),
                         _metaRow('Émise le', '01/01/2026'),
                         _metaRow('Échéance', '31/01/2026'),
                       ] else
@@ -980,39 +981,42 @@ class _ModernDoc extends StatelessWidget {
                 onAddField: onAddField != null
                     ? () => onAddField!(TemplateSectionId.topRight)
                     : null,
-                child: template.topRight.isEmpty
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(template.titleLabel,
-                              style: TextStyle(
-                                  color: textOnHeader,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 2)),
-                          const SizedBox(height: 3),
-                          Text('N° FAC-2026-A3B4C5',
-                              style: TextStyle(
-                                  color: textOnHeader,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 2),
-                          Text('Facture Janv. 2026',
-                              style: TextStyle(
-                                  color: textOnHeader.withOpacity(0.7),
-                                  fontSize: 9)),
-                          Text('Éch. : 31/01/2026',
-                              style: TextStyle(
-                                  color: textOnHeader.withOpacity(0.7),
-                                  fontSize: 9)),
-                        ],
-                      )
-                    : _renderSection(template.topRight, profile,
-                        boldColor: textOnHeader,
-                        baseColor: textOnHeader.withOpacity(0.7),
-                        baseFontSize: 9,
-                        sectionId: TemplateSectionId.topRight,
-                        onFieldTap: onFieldTap),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (template.topRight.isEmpty) ...[
+                      Text(template.titleLabel,
+                          style: TextStyle(
+                              color: textOnHeader,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2)),
+                      const SizedBox(height: 3),
+                      Text('N° FAC-2026-A3B4C5',
+                          style: TextStyle(
+                              color: textOnHeader,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text('Facture Janv. 2026',
+                          style: TextStyle(
+                              color: textOnHeader.withOpacity(0.7),
+                              fontSize: 9)),
+                      Text('Éch. : 31/01/2026',
+                          style: TextStyle(
+                              color: textOnHeader.withOpacity(0.7),
+                              fontSize: 9)),
+                    ] else
+                      _renderSection(template.topRight, profile,
+                          boldColor: textOnHeader,
+                          baseColor: textOnHeader.withOpacity(0.7),
+                          baseFontSize: 9,
+                          sectionId: TemplateSectionId.topRight,
+                          onFieldTap: onFieldTap),
+                    const SizedBox(height: 4),
+                    _statusChipDemo(),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1024,8 +1028,6 @@ class _ModernDoc extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _statusChipDemo(),
-              const SizedBox(height: 8),
               if (!template.topCenter.isEmpty) ...[
                 _SelectableZone(
                   id: TemplateSectionId.topCenter,
@@ -1415,6 +1417,7 @@ class _BoldDoc extends StatelessWidget {
                   child: template.topCenter.isEmpty
                       ? Text(
                           template.titleLabel.toUpperCase(),
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                               color: textOnHeader,
                               fontSize: 20,
@@ -1437,37 +1440,40 @@ class _BoldDoc extends StatelessWidget {
                 onAddField: onAddField != null
                     ? () => onAddField!(TemplateSectionId.topRight)
                     : null,
-                child: template.topRight.isEmpty
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text('Facture Janv. 2026',
-                              style: TextStyle(
-                                  color: textOnHeader,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 2),
-                          Text('N° FAC-2026-A3B4C5',
-                              style: TextStyle(
-                                  color: textOnHeader,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 2),
-                          Text('Émis le 01/01/2026',
-                              style: TextStyle(
-                                  color: textOnHeader.withOpacity(0.7), fontSize: 8)),
-                          Text('Éch. 31/01/2026',
-                              style: TextStyle(
-                                  color: textOnHeader.withOpacity(0.7),
-                                  fontSize: 8)),
-                        ],
-                      )
-                    : _renderSection(template.topRight, profile,
-                        boldColor: textOnHeader,
-                        baseColor: textOnHeader.withOpacity(0.7),
-                        baseFontSize: 8,
-                        sectionId: TemplateSectionId.topRight,
-                        onFieldTap: onFieldTap),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (template.topRight.isEmpty) ...[
+                      Text('Facture Janv. 2026',
+                          style: TextStyle(
+                              color: textOnHeader,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      Text('N° FAC-2026-A3B4C5',
+                          style: TextStyle(
+                              color: textOnHeader,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text('Émis le 01/01/2026',
+                          style: TextStyle(
+                              color: textOnHeader.withOpacity(0.7), fontSize: 8)),
+                      Text('Éch. 31/01/2026',
+                          style: TextStyle(
+                              color: textOnHeader.withOpacity(0.7),
+                              fontSize: 8)),
+                    ] else
+                      _renderSection(template.topRight, profile,
+                          boldColor: textOnHeader,
+                          baseColor: textOnHeader.withOpacity(0.7),
+                          baseFontSize: 8,
+                          sectionId: TemplateSectionId.topRight,
+                          onFieldTap: onFieldTap),
+                    const SizedBox(height: 4),
+                    _statusChipDemo(),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1482,8 +1488,6 @@ class _BoldDoc extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _statusChipDemo(),
-              const SizedBox(height: 8),
               IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1822,7 +1826,7 @@ String _fieldValue(TemplateFieldConfig field, PreviewProfile profile) {
     FieldSource.companyAddress => profile.address,
     FieldSource.companyPhone => profile.phone,
     FieldSource.companyEmail => profile.email,
-    FieldSource.companyRccm => 'RC/ABJ/2024/001',
+    FieldSource.companyRccm => '',
     FieldSource.clientName => 'Jean Dupont',
     FieldSource.clientAddress => 'Abidjan, Plateau',
     FieldSource.clientPhone => '+225 05 00 00 00',
@@ -1833,6 +1837,7 @@ String _fieldValue(TemplateFieldConfig field, PreviewProfile profile) {
     FieldSource.invoiceStatus => 'En cours',
     FieldSource.bankInfo => 'Ma Banque — 123456789',
     FieldSource.invoiceNumber => 'N° FAC-2026-A3B4C5',
+    FieldSource.today => DateFormat('dd/MM/yyyy', 'fr_FR').format(DateTime.now()),
     FieldSource.manual => field.manualValue ?? '',
   };
   if (base.isEmpty) return '';

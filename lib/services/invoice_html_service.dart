@@ -531,7 +531,7 @@ $pageBody
     required String logoHtml,
   }) {
     final centerContent = topCenterHtml.isNotEmpty ? topCenterHtml
-        : '<div style="font-size:20pt;font-weight:bold;letter-spacing:3px;color:$onHeader;">${_e(titleLabel.toUpperCase())}</div>';
+        : '<div style="font-size:20pt;font-weight:bold;letter-spacing:3px;color:$onHeader;text-align:center;">${_e(titleLabel.toUpperCase())}</div>';
 
     final rightContent = topRightHtml.isNotEmpty ? topRightHtml : '''
       <div style="font-size:9pt;font-weight:bold;color:$onHeader;">${_e(invoice.title)}</div>
@@ -547,7 +547,7 @@ $pageBody
 <table width="100%" cellpadding="0" cellspacing="0" bgcolor="$headerHex" style="background-color:$headerHex;">
   <tr>
     $logoCell
-    <td style="padding:20px 14px;vertical-align:middle;">$centerContent</td>
+    <td style="padding:20px 14px;vertical-align:middle;text-align:center;">$centerContent</td>
     <td style="padding:20px 18px 20px 14px;vertical-align:top;text-align:right;white-space:nowrap;">$rightContent</td>
   </tr>
 </table>
@@ -623,6 +623,7 @@ $pageBody
         ].join(' — '),
       FieldSource.invoiceNumber  =>
           'N° FAC-${invoice.createdAt.year}-${invoice.id.substring(0, 6).toUpperCase()}',
+      FieldSource.today          => DateFormatter.format(DateTime.now()),
       FieldSource.manual         => f.manualValue ?? '',
     };
     return raw;

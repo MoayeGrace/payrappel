@@ -535,6 +535,8 @@ ${payments.isNotEmpty ? '''
         return parts.join(' — ');
       case FieldSource.invoiceNumber:
         return 'N° FAC-${invoice.createdAt.year}-${invoice.id.substring(0, 6).toUpperCase()}';
+      case FieldSource.today:
+        return DateFormatter.format(DateTime.now());
       case FieldSource.manual:
         return f.manualValue ?? '';
     }
