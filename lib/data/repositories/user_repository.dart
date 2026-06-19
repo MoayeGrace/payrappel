@@ -22,16 +22,4 @@ class UserRepository {
     await _doc.set(user.toMap());
     return user;
   }
-
-  Future<void> updateProStatus({
-    required bool isPro,
-    DateTime? proExpiry,
-    String? planType,
-  }) async {
-    await _doc.set({
-      'isPro': isPro,
-      if (proExpiry != null) 'proExpiry': proExpiry.millisecondsSinceEpoch,
-      if (planType != null) 'planType': planType,
-    }, SetOptions(merge: true));
-  }
 }

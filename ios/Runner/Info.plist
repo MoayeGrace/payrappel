@@ -43,6 +43,8 @@
 	</array>
 	<key>NSContactsUsageDescription</key>
 	<string>PayRappel utilise vos contacts pour importer facilement le nom et le numéro de téléphone d'un client.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PayRappel utilise votre photothèque pour ajouter le logo de votre entreprise sur vos factures.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

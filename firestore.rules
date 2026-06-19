@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    // Les champs d'abonnement ne doivent être modifiables que via
+    // l'Admin SDK (Cloud Functions côté serveur), jamais depuis le client.
+    function subscriptionUnchanged() {
+      return request.resource.data.get('isPro', false)    == resource.data.get('isPro', false)
+          && request.resource.data.get('proExpiry', null) == resource.data.get('proExpiry', null)
+          && request.resource.data.get('planType', null)  == resource.data.get('planType', null);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+
+      // Création : isPro doit être absent ou false, champs proExpiry/planType interdits
+      allow create: if isOwner(userId)
+          && request.resource.data.get('isPro', false) == false
+          && !request.resource.data.keys().hasAny(['proExpiry', 'planType']);
+
+      // Mise à jour : champs d'abonnement immuables côté client
+      allow update: if isOwner(userId) && subscriptionUnchanged();
+
+      match /clients/{clientId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /invoices/{invoiceId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /payments/{paymentId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /reminders/{reminderId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /invoice_templates/{templateId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Refus explicite de tout le reste
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
