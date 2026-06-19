@@ -771,23 +771,7 @@ class _ClassicDoc extends StatelessWidget {
                             sectionId: TemplateSectionId.topRight,
                             onFieldTap: onFieldTap),
                       const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A73E8).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                              color: const Color(0xFF1A73E8), width: 0.5),
-                        ),
-                        child: const Text(
-                          'En cours',
-                          style: TextStyle(
-                              color: Color(0xFF1A73E8),
-                              fontSize: 7,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                      _statusChipDemo(),
                     ],
                   ),
                 ),
@@ -1038,7 +1022,10 @@ class _ModernDoc extends StatelessWidget {
           color: Colors.white,
           padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _statusChipDemo(),
+              const SizedBox(height: 8),
               if (!template.topCenter.isEmpty) ...[
                 _SelectableZone(
                   id: TemplateSectionId.topCenter,
@@ -1219,33 +1206,40 @@ class _MinimalDoc extends StatelessWidget {
                 onAddField: onAddField != null
                     ? () => onAddField!(TemplateSectionId.topRight)
                     : null,
-                child: template.topRight.isEmpty
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            template.titleLabel,
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: accent,
-                                letterSpacing: 2),
-                          ),
-                          const SizedBox(height: 2),
-                          Text('N° FAC-2026-A3B4C5',
-                              style: TextStyle(
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                  color: accent)),
-                          _metaRow('Émise', '01/01/2026'),
-                          _metaRow('Échéance', '31/01/2026'),
-                        ],
-                      )
-                    : _renderSection(template.topRight, profile,
-                        boldColor: const Color(0xFF202124),
-                        baseFontSize: 9,
-                        sectionId: TemplateSectionId.topRight,
-                        onFieldTap: onFieldTap),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    template.topRight.isEmpty
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                template.titleLabel,
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: accent,
+                                    letterSpacing: 2),
+                              ),
+                              const SizedBox(height: 2),
+                              Text('N° FAC-2026-A3B4C5',
+                                  style: TextStyle(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                      color: accent)),
+                              _metaRow('Émise', '01/01/2026'),
+                              _metaRow('Échéance', '31/01/2026'),
+                            ],
+                          )
+                        : _renderSection(template.topRight, profile,
+                            boldColor: const Color(0xFF202124),
+                            baseFontSize: 9,
+                            sectionId: TemplateSectionId.topRight,
+                            onFieldTap: onFieldTap),
+                    const SizedBox(height: 4),
+                    _statusChipDemo(),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1486,7 +1480,10 @@ class _BoldDoc extends StatelessWidget {
           color: Colors.white,
           padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _statusChipDemo(),
+              const SizedBox(height: 8),
               IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1720,14 +1717,42 @@ Widget _customFieldsBox(Color accent) {
         color: accent.withOpacity(0.04),
         borderRadius: BorderRadius.circular(5),
         border: Border.all(color: accent.withOpacity(0.18), width: 0.5)),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    child: const Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        _sectionLabel('CHAMPS LIBRES'),
-        const SizedBox(height: 4),
-        _grey('Conditions de paiement'),
-        _grey('Références, notes...'),
+        Text(
+          'CHAMPS LIBRES',
+          textAlign: TextAlign.right,
+          style: TextStyle(
+              fontSize: 7,
+              color: Color(0xFF9AA0A6),
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8),
+        ),
+        SizedBox(height: 4),
+        Text('Conditions de paiement',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontSize: 9, color: Color(0xFF5F6368))),
+        Text('Références, notes...',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontSize: 9, color: Color(0xFF5F6368))),
       ],
+    ),
+  );
+}
+
+Widget _statusChipDemo() {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1A73E8).withOpacity(0.12),
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: const Color(0xFF1A73E8), width: 0.5),
+    ),
+    child: const Text(
+      'En cours',
+      style: TextStyle(
+          color: Color(0xFF1A73E8), fontSize: 7, fontWeight: FontWeight.bold),
     ),
   );
 }
@@ -1845,6 +1870,8 @@ Widget _renderSection(
     children: section.fields.asMap().entries.map<Widget>((entry) {
       final i = entry.key;
       final f = entry.value;
+      // Le statut est affiché via le chip hardcodé dans chaque layout — jamais via _renderSection
+      if (f.source == FieldSource.invoiceStatus) return const SizedBox.shrink();
       final text = _fieldValue(f, profile);
       final isEditing = onFieldTap != null && sectionId != null;
       if (text.isEmpty && !isEditing) return const SizedBox.shrink();
