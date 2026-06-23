@@ -44,14 +44,18 @@ class _LineItemCtrl {
     description.addListener(fn);
     qty.addListener(fn);
     unitPrice.addListener(fn);
-    for (final c in extras.values) c.addListener(fn);
+    for (final c in extras.values) {
+      c.addListener(fn);
+    }
   }
 
   void dispose() {
     description.dispose();
     qty.dispose();
     unitPrice.dispose();
-    for (final c in extras.values) c.dispose();
+    for (final c in extras.values) {
+      c.dispose();
+    }
   }
 
   Map<String, dynamic> toMap() => {

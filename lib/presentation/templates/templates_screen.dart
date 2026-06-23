@@ -29,7 +29,7 @@ class TemplatesScreen extends StatelessWidget {
             children: [
               const _InfoBanner(),
               const SizedBox(height: 20),
-              _SectionLabel('Templates prédéfinis'),
+              const _SectionLabel('Templates prédéfinis'),
               _TemplateGrid(
                 templates: builtins,
                 onTap: (t) => context.push('/templates/preview', extra: t),
@@ -37,7 +37,7 @@ class TemplatesScreen extends StatelessWidget {
               ),
               if (custom.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                _SectionLabel('Mes templates'),
+                const _SectionLabel('Mes templates'),
                 _TemplateGrid(
                   templates: custom,
                   onTap: (t) => context.push('/templates/preview', extra: t),

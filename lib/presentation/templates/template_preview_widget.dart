@@ -276,7 +276,7 @@ class _BoldPreview extends StatelessWidget {
                       color: Colors.white.withOpacity(0.2),
                       shape: BoxShape.circle)),
               const SizedBox(width: 5),
-              Expanded(
+              const Expanded(
                 child: Text('FACTURE',
                     style: TextStyle(
                         color: Colors.white,
