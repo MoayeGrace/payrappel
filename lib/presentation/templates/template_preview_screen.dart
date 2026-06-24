@@ -26,16 +26,16 @@ class PreviewProfile {
 
   factory PreviewProfile.from(BusinessProfileModel p) => PreviewProfile(
         companyName: p.companyName.isEmpty ? 'Mon Entreprise' : p.companyName,
-        address: p.address.isEmpty ? 'Abidjan, Plateau' : p.address,
-        phone: p.phone.isEmpty ? '+225 07 00 00 00' : p.phone,
-        email: p.email.isEmpty ? 'contact@entreprise.com' : p.email,
+        address: p.address.isEmpty ? 'Votre ville' : p.address,
+        phone: p.phone.isEmpty ? '00 00 00 00' : p.phone,
+        email: p.email.isEmpty ? 'contact@monentreprise.com' : p.email,
       );
 
   static const demo = PreviewProfile(
     companyName: 'Mon Entreprise',
-    address: 'Abidjan, Plateau',
-    phone: '+225 07 00 00 00',
-    email: 'contact@entreprise.com',
+    address: 'Votre ville',
+    phone: '00 00 00 00',
+    email: 'contact@monentreprise.com',
   );
 }
 

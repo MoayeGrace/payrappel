@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
@@ -18,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  String? _errorText;
 
   @override
   void dispose() {
@@ -28,22 +30,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
+    setState(() { _isLoading = true; _errorText = null; });
     try {
       await _authRepo.login(
         email: _emailController.text,
         password: _passwordController.text,
       );
       if (mounted) context.go('/home');
-    } on Exception catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_errorMessage(e.toString())),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) setState(() => _errorText = _errorMessage(e.code));
+    } on Exception catch (_) {
+      if (mounted) setState(() => _errorText = 'Erreur de connexion. Vérifie ta connexion internet.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -68,12 +65,103 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  String _errorMessage(String error) {
+  Future<void> _forgotPassword() async {
+    final emailController = TextEditingController(text: _emailController.text);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Mot de passe oublié'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Entre ton adresse email. On t\'envoie un lien pour réinitialiser ton mot de passe.',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                hintText: 'Adresse email',
+                prefixIcon: const Icon(Icons.email_outlined),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, emailController.text),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1A73E8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Envoyer', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null || result.trim().isEmpty) return;
+
+    try {
+      await _authRepo.resetPassword(result.trim());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Email envoyé ! Vérifie ta boîte mail.'),
+            backgroundColor: Color(0xFF34A853),
+          ),
+        );
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_resetErrorMessage(e.toString())),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  String _resetErrorMessage(String error) {
     if (error.contains('user-not-found')) return 'Aucun compte avec cet email.';
-    if (error.contains('wrong-password')) return 'Mot de passe incorrect.';
     if (error.contains('invalid-email')) return 'Email invalide.';
-    if (error.contains('too-many-requests')) return 'Trop de tentatives. Réessaie plus tard.';
-    return 'Erreur de connexion. Vérifie tes informations.';
+    return 'Erreur. Vérifie ton adresse email.';
+  }
+
+  String _errorMessage(String code) {
+    switch (code) {
+      case 'invalid-credential':
+      case 'wrong-password':
+      case 'user-not-found':
+        return 'Email ou mot de passe incorrect.';
+      case 'invalid-email':
+        return 'Email invalide.';
+      case 'too-many-requests':
+        return 'Trop de tentatives. Réessaie plus tard.';
+      case 'network-request-failed':
+        return 'Pas de connexion internet.';
+      case 'operation-not-allowed':
+        return 'Connexion par email non activée.';
+      default:
+        return 'Erreur ($code). Réessaie.';
+    }
   }
 
   @override
@@ -224,10 +312,37 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         const SizedBox(height: 8),
 
+                        if (_errorText != null)
+                          Container(
+                            margin: const EdgeInsets.only(top: 8, bottom: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.25)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    _errorText!,
+                                    style: const TextStyle(
+                                      color: Color(0xFFDC2626),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: () {},
+                            onPressed: _forgotPassword,
                             child: const Text(
                               "Mot de passe oublié ?",
                               style: TextStyle(

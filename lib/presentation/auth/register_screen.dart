@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
@@ -19,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  String? _errorText;
 
   @override
   void dispose() {
@@ -30,7 +32,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
+    setState(() { _isLoading = true; _errorText = null; });
     try {
       if (_authRepo.isAnonymous) {
         await _authRepo.linkGuestToEmail(
@@ -93,26 +95,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         );
       }
-    } on Exception catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_errorMessage(e.toString())),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) setState(() => _errorText = _errorMessage(e.code));
+    } on Exception catch (_) {
+      if (mounted) setState(() => _errorText = 'Erreur. Vérifie ta connexion internet.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  String _errorMessage(String error) {
-    if (error.contains('email-already-in-use')) return 'Cet email est déjà utilisé.';
-    if (error.contains('invalid-email')) return 'Email invalide.';
-    if (error.contains('weak-password')) return 'Mot de passe trop faible.';
-    if (error.contains('credential-already-in-use')) return 'Ce compte existe déjà.';
-    return 'Erreur lors de la création du compte.';
+  String _errorMessage(String code) {
+    switch (code) {
+      case 'email-already-in-use':
+        return 'Cet email est déjà utilisé.';
+      case 'invalid-email':
+        return 'Email invalide.';
+      case 'weak-password':
+        return 'Mot de passe trop faible (min. 6 caractères).';
+      case 'credential-already-in-use':
+        return 'Ce compte existe déjà.';
+      case 'network-request-failed':
+        return 'Pas de connexion internet.';
+      case 'operation-not-allowed':
+        return 'Création de compte non activée.';
+      default:
+        return 'Erreur ($code). Réessaie.';
+    }
   }
 
   @override
@@ -322,6 +330,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ? 'Les mots de passe ne correspondent pas'
                                 : null,
                       ),
+
+                      if (_errorText != null)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4, bottom: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.25)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _errorText!,
+                                  style: const TextStyle(
+                                    color: Color(0xFFDC2626),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
 
                       const SizedBox(height: 28),
 
