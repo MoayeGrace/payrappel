@@ -256,10 +256,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
+                        style: const TextStyle(color: Color(0xFF1A1A2E)),
                         decoration: InputDecoration(
                           hintText: "Adresse email",
-                          prefixIcon:
-                              const Icon(Icons.email_outlined),
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF94A3B8)),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
                           border: OutlineInputBorder(
@@ -279,10 +280,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
+                        style: const TextStyle(color: Color(0xFF1A1A2E)),
                         decoration: InputDecoration(
                           hintText: "Mot de passe",
-                          prefixIcon:
-                              const Icon(Icons.lock_outline),
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF94A3B8)),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
                           border: OutlineInputBorder(
@@ -295,6 +297,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               _obscurePassword
                                   ? Icons.visibility_outlined
                                   : Icons.visibility_off_outlined,
+                              color: const Color(0xFF94A3B8),
                             ),
                             onPressed: () => setState(
                               () => _obscurePassword =
@@ -313,10 +316,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         controller: _confirmPasswordController,
                         obscureText: _obscurePassword,
+                        style: const TextStyle(color: Color(0xFF1A1A2E)),
                         decoration: InputDecoration(
                           hintText: "Confirmer le mot de passe",
-                          prefixIcon:
-                              const Icon(Icons.verified_user_outlined),
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.verified_user_outlined, color: Color(0xFF94A3B8)),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
                           border: OutlineInputBorder(

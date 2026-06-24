@@ -1,16 +1,40 @@
+<div align="center">
+
 # PayRappel
 
-**Application mobile de gestion des paiements et de rappels automatiques pour les petites entreprises et travailleurs indépendants.**
+**Application mobile de gestion des paiements et de rappels automatiques**  
+*Pour les entrepreneurs, freelances et petites entreprises d'Afrique francophone*
 
-Disponible sur **Android** et **iOS**.
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
+[![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%2B%20Auth-FFCA28?logo=firebase)](https://firebase.google.com)
+[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS-green)](https://flutter.dev)
+[![License](https://img.shields.io/badge/Licence-Propriétaire-red)](LICENSE)
+
+</div>
+
+---
+
+## Aperçu
+
+<p align="center">
+  <img src="assets/screens/page_d_accueil_dashboard.jpg" width="220">
+  <img src="assets/screens/mini_dashboard_interactif.jpg" width="220">
+  <img src="assets/screens/contacts.jpg" width="220">
+</p>
+
+<p align="center">
+  <img src="assets/screens/enregistrement_facture.jpg" width="220">
+  <img src="assets/screens/templates_facture.jpg" width="220">
+  <img src="assets/screens/generation_rapport_excel_pdf.jpg" width="220">
+</p>
 
 ---
 
 ## Présentation
 
-PayRappel est une solution simple et efficace pour gérer vos clients, créer des factures professionnelles, suivre les paiements partiels et envoyer des rappels automatiques aux clients en retard de paiement.
+PayRappel est une solution complète et **entièrement gratuite** pour gérer vos clients, créer des factures professionnelles, suivre les paiements partiels et envoyer des rappels automatiques aux clients en retard de paiement.
 
-Conçue pour les entrepreneurs, freelances et petites entreprises d'Afrique francophone, l'application fonctionne en **FCFA** et supporte le mode **hors ligne**.
+Conçue pour les entrepreneurs d'Afrique francophone, l'application fonctionne en **FCFA** et reste **100% fonctionnelle hors ligne**.
 
 ---
 
@@ -23,8 +47,8 @@ Conçue pour les entrepreneurs, freelances et petites entreprises d'Afrique fran
 
 ### Facturation
 - Créer des factures avec articles, quantités et montants
-- Suivre le statut de chaque facture : `Brouillon`, `Partiel`, `Payé`, `En retard`
-- Enregistrer des paiements partiels et calculer automatiquement le solde restant
+- Suivre le statut de chaque facture : `Brouillon` · `Partiel` · `Payé` · `En retard`
+- Enregistrer des paiements partiels avec calcul automatique du solde restant
 
 ### Templates de factures
 - 4 modèles de design : Classique, Moderne, Minimaliste, Audacieux
@@ -33,7 +57,7 @@ Conçue pour les entrepreneurs, freelances et petites entreprises d'Afrique fran
 
 ### Export
 - Génération de **PDF** et **Excel**
-- Partage direct depuis l'application
+- Partage direct depuis l'application (email, WhatsApp, etc.)
 
 ### Rappels automatiques
 - Planifier des rappels avant, à la date ou après l'échéance
@@ -45,7 +69,7 @@ Conçue pour les entrepreneurs, freelances et petites entreprises d'Afrique fran
 - Logo affiché sur les factures exportées
 
 ### Modes de paiement
-- Configurer les moyens de paiement acceptés : Orange Money, Wave, MTN MoMo, Moov Money, Djamo, Stripe, PayPal, VISA, Mastercard
+- Configurer les moyens acceptés : Orange Money, Wave, MTN MoMo, Moov Money, Djamo, Stripe, PayPal, VISA, Mastercard
 
 ---
 
@@ -83,7 +107,8 @@ lib/
 └── providers/      → State management (Provider)
 ```
 
-**Flux de données :** les écrans appellent les repositories (couche `data/`) qui communiquent avec Firebase. Les règles métier (ex. calcul du solde restant) vivent dans `domain/`, appelées par les repositories ou les écrans.
+**Modèle architectural :** Clean Architecture 3 couches + pattern MVVM via Provider.  
+Les écrans appellent les repositories (couche `data/`) qui communiquent avec Firebase. Les règles métier (calcul du solde, statut des factures) vivent dans `domain/`, indépendantes de tout framework.
 
 ---
 
@@ -133,6 +158,9 @@ flutter test
 
 # Build Android (AAB pour Play Store)
 flutter build appbundle --release
+
+# Build Android (APK direct)
+flutter build apk --split-per-abi --release
 
 # Build iOS (requires macOS + Xcode)
 flutter build ios --release
