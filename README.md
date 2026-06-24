@@ -32,13 +32,13 @@ Conçue pour les entrepreneurs, freelances et petites entreprises d'Afrique fran
 - Prévisualisation en temps réel
 
 ### Export
-- Génération de **PDF** et **Excel** (plan Pro)
+- Génération de **PDF** et **Excel**
 - Partage direct depuis l'application
 
 ### Rappels automatiques
 - Planifier des rappels avant, à la date ou après l'échéance
-- Notifications push (plan Gratuit)
-- Rappels WhatsApp (plan Pro)
+- Notifications push
+- Rappels WhatsApp
 
 ### Profil entreprise
 - Nom, logo, coordonnées, mentions légales
@@ -49,16 +49,9 @@ Conçue pour les entrepreneurs, freelances et petites entreprises d'Afrique fran
 
 ---
 
-## Plans tarifaires
+## Gratuit
 
-| Fonctionnalité | Gratuit | Pro |
-|---|:---:|:---:|
-| Clients | 20 max | Illimité |
-| Opérations/mois | 30 max | Illimité |
-| Notifications push | ✅ | ✅ |
-| Export PDF / Excel | ❌ | ✅ |
-| Rappels WhatsApp | ❌ | ✅ |
-| Templates personnalisés | ❌ | ✅ |
+PayRappel est **entièrement gratuit**. Toutes les fonctionnalités sont accessibles sans abonnement ni frais cachés.
 
 ---
 
@@ -97,7 +90,6 @@ lib/
 ## Sécurité
 
 - Règles Firestore déployées : chaque utilisateur accède uniquement à ses propres données
-- Les champs d'abonnement (`isPro`, `proExpiry`, `planType`) sont immuables côté client — modification possible uniquement via l'Admin SDK (Cloud Functions)
 - Mode invité : les utilisateurs anonymes ont un UID Firebase et peuvent convertir leur compte en compte email sans perte de données
 - Persistance hors ligne : Firestore cache toutes les données localement (`cacheSizeBytes: CACHE_SIZE_UNLIMITED`)
 
