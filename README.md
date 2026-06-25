@@ -34,7 +34,7 @@
 
 PayRappel est une solution complète et **entièrement gratuite** pour gérer vos clients, créer des factures professionnelles, suivre les paiements partiels et envoyer des rappels automatiques aux clients en retard de paiement.
 
-Conçue pour les entrepreneurs d'Afrique francophone, l'application fonctionne en **FCFA** et reste **100% fonctionnelle hors ligne**.
+Conçue pour les entrepreneurs d'Afrique francophone, l'application fonctionne en **plusieures monnaies** et reste **100% fonctionnelle hors ligne**.
 
 ---
 
@@ -92,7 +92,7 @@ PayRappel est **entièrement gratuit**. Toutes les fonctionnalités sont accessi
 | Export PDF | package `pdf` + `printing` |
 | Export Excel | package `excel` |
 | Graphiques | fl_chart |
-| Locale | Français (fr_FR), FCFA |
+| Locale | Français (fr_FR), FCFA... |
 
 ---
 
@@ -115,6 +115,7 @@ Les écrans appellent les repositories (couche `data/`) qui communiquent avec Fi
 ## Sécurité
 
 - Règles Firestore déployées : chaque utilisateur accède uniquement à ses propres données
+- Encryptage activé
 - Mode invité : les utilisateurs anonymes ont un UID Firebase et peuvent convertir leur compte en compte email sans perte de données
 - Persistance hors ligne : Firestore cache toutes les données localement (`cacheSizeBytes: CACHE_SIZE_UNLIMITED`)
 
@@ -133,7 +134,7 @@ Les écrans appellent les repositories (couche `data/`) qui communiquent avec Fi
 
 ```bash
 # Cloner le dépôt
-git clone https://github.com/ton-utilisateur/payrappel.git
+git clone https://github.com/MoayeGrace/payrappel.git
 cd payrappel
 
 # Installer les dépendances
